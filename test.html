@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webaction AI Chat Test</title>
+</head>
+<body>
+  <main>
+    <h1>Webaction AI Chat Test</h1>
+    <p>This is a simple local test page for the Webaction AI Chat widget.</p>
+  </main>
+
+  <script src="widget/chat-widget.js"></script>
+  <script>
+    WebactionChat.init({
+      apiUrl: "http://localhost:3000",
+      siteId: "client-001"
+    });
+  </script>
+</body>
+</html>
