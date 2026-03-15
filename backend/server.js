@@ -2,6 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const OpenAI = require("openai");
+const sites = require("./data/sites");
+const {
+  getSiteIndexStatus,
+  indexSite,
+  retrieveRelevantChunks
+} = require("./services/retrievalService");
 
 dotenv.config();
 
@@ -26,6 +32,42 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/sites", (_req, res) => {
+  res.json({ sites });
+});
+
+app.post("/index-site", async (req, res) => {
+  const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
+
+  if (!siteId) {
+    return res.status(400).json({ error: "siteId is required" });
+  }
+
+  try {
+    const summary = await indexSite(siteId);
+    return res.json(summary);
+  } catch (error) {
+    console.error("Site indexing failed:", error);
+
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to index site"
+    });
+  }
+});
+
+app.get("/site-index/:siteId", (req, res) => {
+  const siteId = typeof req.params.siteId === "string" ? req.params.siteId.trim() : "";
+  const summary = getSiteIndexStatus(siteId);
+
+  if (!summary.configured) {
+    return res.status(404).json({
+      error: `Unknown siteId: ${siteId}`
+    });
+  }
+
+  return res.json(summary);
+});
+
 app.post("/chat", async (req, res) => {
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
@@ -38,17 +80,46 @@ app.post("/chat", async (req, res) => {
     return res.status(400).json({ error: "siteId is required" });
   }
 
+  if (!sites[siteId]) {
+    return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
+  }
+
   try {
+    const retrievalResult = await retrieveRelevantChunks(siteId, message);
+    const contextBlocks = retrievalResult.chunks
+      .map((chunk, index) => {
+        return `Source ${index + 1}: ${chunk.url}\n${chunk.text}`;
+      })
+      .join("\n\n");
+
+    if (retrievalResult.site.chunkCount === 0) {
+      return res.json({
+        reply:
+          "I could not find enough website content for this site yet. Please run indexing or check the site crawl target.",
+        sources: []
+      });
+    }
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
           content:
-            "You are a helpful website assistant for Webaction client websites. " +
-            "Answer clearly and concisely. If a question depends on site-specific details " +
-            "that are not available, explain what information is missing. " +
-            `The current client site identifier is ${siteId}.`
+            "You are a helpful website assistant for a Webaction client website. " +
+            "Answer using only the provided site content when possible. " +
+            "Answer in the same language as the user when possible. " +
+            "Stay concise. Do not invent services, pricing, hours, contact details, policies, or other facts that are not supported by the site content. " +
+            "If the answer is not available in the provided site content, clearly say that the information was not found on the site."
+        },
+        {
+          role: "system",
+          content:
+            `Site ID: ${siteId}\n` +
+            `Site name: ${retrievalResult.site.siteName}\n` +
+            `Site URL: ${retrievalResult.site.siteUrl}\n\n` +
+            "Relevant site content:\n" +
+            contextBlocks
         },
         {
           role: "user",
@@ -63,7 +134,10 @@ app.post("/chat", async (req, res) => {
       return res.status(502).json({ error: "No reply returned from OpenAI" });
     }
 
-    return res.json({ reply });
+    return res.json({
+      reply,
+      sources: retrievalResult.chunks.map((chunk) => chunk.url)
+    });
   } catch (error) {
     console.error("Chat request failed:", error);
 

@@ -141,17 +141,24 @@
         })
       })
         .then(function (response) {
-          if (!response.ok) {
-            throw new Error("Request failed with status " + response.status);
-          }
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "Request failed with status " + response.status);
+            }
 
-          return response.json();
+            return data;
+          });
         })
         .then(function (data) {
           appendMessage("ai", data.reply || "No reply returned.");
         })
-        .catch(function () {
-          appendMessage("ai", "Sorry, something went wrong. Please try again.");
+        .catch(function (error) {
+          appendMessage(
+            "ai",
+            error && error.message
+              ? error.message
+              : "Sorry, something went wrong. Please try again."
+          );
         })
         .finally(function () {
           input.disabled = false;
