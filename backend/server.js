@@ -3,12 +3,17 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const OpenAI = require("openai");
 const path = require("path");
-const sites = require("./data/sites");
 const {
   getSiteIndexStatus,
   indexSite,
   retrieveRelevantChunks
 } = require("./services/retrievalService");
+const {
+  createSiteEntry,
+  findSiteBySiteId,
+  listSites,
+  normalizeSiteUrl
+} = require("./services/siteRegistryService");
 
 dotenv.config();
 
@@ -28,6 +33,23 @@ app.use(cors());
 app.use(express.json());
 app.use("/widget", express.static(widgetDirectory));
 
+app.set("trust proxy", true);
+
+function getBaseUrl(req) {
+  return (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+}
+
+function buildEmbedCode(baseUrl, siteId) {
+  return `<script src="${baseUrl}/widget/chat-widget.js"></script>
+<script>
+WebactionChat.init({
+  apiUrl: "${baseUrl}",
+  siteId: "${siteId}",
+  title: "Assistant"
+});
+</script>`;
+}
+
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
@@ -36,7 +58,60 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/sites", (_req, res) => {
-  res.json({ sites });
+  res.json(listSites());
+});
+
+app.get("/sites/:siteId", (req, res) => {
+  const siteId = typeof req.params.siteId === "string" ? req.params.siteId.trim() : "";
+  const site = findSiteBySiteId(siteId);
+
+  if (!site) {
+    return res.status(404).json({
+      error: `Unknown siteId: ${siteId}`
+    });
+  }
+
+  return res.json(site);
+});
+
+app.post("/register-site", async (req, res) => {
+  const siteName = typeof req.body.siteName === "string" ? req.body.siteName.trim() : "";
+  const siteUrlInput = typeof req.body.siteUrl === "string" ? req.body.siteUrl.trim() : "";
+
+  if (!siteName) {
+    return res.status(400).json({ error: "siteName is required" });
+  }
+
+  if (!siteUrlInput) {
+    return res.status(400).json({ error: "siteUrl is required" });
+  }
+
+  try {
+    const normalizedSiteUrl = normalizeSiteUrl(siteUrlInput);
+    const { site } = createSiteEntry({
+      siteName,
+      siteUrl: normalizedSiteUrl
+    });
+
+    const indexSummary = await indexSite(site.siteId);
+    const baseUrl = getBaseUrl(req);
+
+    return res.json({
+      siteId: site.siteId,
+      siteName: site.siteName,
+      siteUrl: site.siteUrl,
+      widgetUrl: `${baseUrl}/widget/chat-widget.js`,
+      apiUrl: baseUrl,
+      embedCode: buildEmbedCode(baseUrl, site.siteId),
+      indexSummary
+    });
+  } catch (error) {
+    console.error("Site registration failed:", error);
+
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to register site"
+    });
+  }
 });
 
 app.post("/index-site", async (req, res) => {
@@ -83,7 +158,7 @@ app.post("/chat", async (req, res) => {
     return res.status(400).json({ error: "siteId is required" });
   }
 
-  if (!sites[siteId]) {
+  if (!findSiteBySiteId(siteId)) {
     return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
   }
 

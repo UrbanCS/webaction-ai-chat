@@ -2,15 +2,9 @@
 
 ## Goal
 
-Deliver an embeddable AI chat system that Webaction can place on client websites, especially Joomla sites first, while keeping the backend architecture simple enough to upgrade later.
+Deliver an embeddable AI chat system that Webaction can onboard onto client websites, especially Joomla first and WordPress later, without editing backend code for every new client.
 
-This version is a first practical RAG MVP:
-
-- no external chatbot SaaS
-- no database yet
-- no Supabase yet
-- no embeddings yet
-- no vector database yet
+This version adds automatic onboarding with a JSON-backed site registry.
 
 ## Architecture
 
@@ -24,7 +18,7 @@ chat-widget.js
 Webaction backend API
     |
     v
-siteId -> site URL
+sites.json registry
     |
     v
 crawl + extract + chunk + cache
@@ -34,247 +28,88 @@ retrieve relevant chunks
     |
     v
 OpenAI API
-    |
-    v
-response returned to user
 ```
-
-## Main Flow
-
-1. A client website embeds `chat-widget.js`.
-2. The widget sends `message` and `siteId` to `POST /chat`.
-3. The backend maps `siteId` to a configured site URL.
-4. The retrieval layer loads a cached site index or crawls the site if needed.
-5. The crawler fetches the homepage and tries `sitemap.xml`.
-6. The extraction layer removes noisy HTML and returns readable text.
-7. The chunking layer splits page text into prompt-sized chunks.
-8. The retrieval layer scores chunks against the visitor question.
-9. The backend sends the best chunks to OpenAI with grounding instructions.
-10. The backend returns the final answer to the widget.
 
 ## Site Registry
 
-The site registry lives in [backend/data/sites.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/data/sites.js).
+The registry is stored in [backend/data/sites.json](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/data/sites.json).
 
-It maps:
+The service layer lives in [backend/services/siteRegistryService.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/services/siteRegistryService.js).
 
-- `siteId`
-- site name
-- site URL
+It is responsible for:
 
-Example:
+- loading sites from JSON
+- saving sites to JSON
+- finding a site by `siteId`
+- finding a site by URL
+- generating the next `client-XXX` id
+- creating a new site entry
 
-```js
-module.exports = {
-  "client-001": {
-    url: "https://example.com",
-    name: "Example Client"
-  }
-};
-```
+## Onboarding Flow
 
-This is the first multi-site control point. Later it can store richer per-client settings.
-
-## Crawling Flow
-
-The crawler lives in [backend/services/siteCrawler.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/services/siteCrawler.js).
-
-For the MVP it:
-
-- fetches the homepage
-- tries `sitemap.xml` and `sitemap_index.xml`
-- reads a limited number of URLs from the sitemap when available
-- falls back to internal homepage links when no sitemap is usable
-- keeps crawling on the same domain only
-- ignores obvious non-content or non-HTML targets
-- keeps the crawl small for speed and safety
-
-This is intentionally conservative because the goal is a practical first implementation, not a full crawler.
-
-## Extraction Flow
-
-The extraction layer lives in [backend/services/contentExtraction.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/services/contentExtraction.js).
-
-It:
-
-- removes scripts, styles, nav, footer, forms, and similar noise
-- strips remaining tags
-- decodes basic HTML entities
-- normalizes whitespace
-- returns plain readable text
-
-## Chunking Flow
-
-The chunking layer lives in [backend/services/chunking.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/services/chunking.js).
-
-It:
-
-- processes extracted page text
-- splits text into moderate chunks
-- preserves the source URL
-- returns chunk objects ready for retrieval and prompt injection
-
-## Retrieval Flow
-
-The retrieval layer lives in [backend/services/retrievalService.js](/mnt/c/Users/marca/OneDrive/Desktop/webaction-ai-chat/backend/services/retrievalService.js).
-
-It:
-
-- indexes a site on demand if not already cached
-- stores pages and chunks in memory by `siteId`
-- scores chunks using a simple keyword overlap method
-- returns the top matching chunks and their source URLs
-
-This is the replaceable part of the MVP. Later it can be swapped for embeddings and vector search without changing the widget contract.
-
-## In-Memory Cache Behavior
-
-The cache is process-local and development-friendly:
-
-- keyed by `siteId`
-- stores extracted pages and chunks
-- avoids recrawling the same site for every request
-- is cleared whenever the backend restarts
-
-No persistence is implemented yet.
-
-## OpenAI Prompt Flow
-
-`POST /chat` now builds a prompt with:
-
-- grounding instructions
-- site identity from the registry
-- top retrieved chunks
-- source URLs
-- the user question
-
-The assistant is instructed to:
-
-- answer from the provided site content
-- answer in the same language as the user when possible
-- stay concise
-- avoid inventing missing facts
-- clearly say when the information was not found on the site
+1. Webaction calls `POST /register-site`.
+2. The backend validates `siteUrl` and `siteName`.
+3. The URL is normalized.
+4. The registry checks whether the site already exists.
+5. A new `siteId` is created if needed.
+6. The site is saved into `sites.json`.
+7. The backend immediately indexes the site.
+8. The response returns `siteId`, `widgetUrl`, `apiUrl`, and `embedCode`.
 
 ## API Routes
 
-Core routes:
-
-- `GET /health`
-- `POST /chat`
-
-RAG development routes:
-
+- `POST /register-site`
 - `GET /sites`
+- `GET /sites/:siteId`
 - `POST /index-site`
 - `GET /site-index/:siteId`
+- `POST /chat`
+- `GET /health`
 
-### `POST /index-site`
+## Public Widget Serving
 
-Request:
+The backend serves the widget from:
 
-```json
-{
-  "siteId": "client-001"
-}
+```text
+/widget/chat-widget.js
 ```
 
-Response includes summary fields such as:
+This allows Joomla or WordPress sites to embed it directly from the backend domain.
 
-- indexed site
-- page count
-- chunk count
-- indexed timestamp
+## RAG Flow
 
-### `GET /site-index/:siteId`
+After a site is registered:
 
-Returns:
+1. indexing fetches the site
+2. HTML is cleaned into text
+3. text is chunked
+4. chunks are cached in memory
+5. `/chat` retrieves relevant chunks
+6. OpenAI answers from that retrieved context
 
-- whether the `siteId` is configured
-- whether it is currently indexed
-- page count
-- chunk count
-- timestamp
+## PUBLIC_BASE_URL
 
-## Widget Behavior
+If `PUBLIC_BASE_URL` is set, the backend uses it when generating:
 
-The widget remains mostly unchanged.
-
-It still:
-
-- takes `apiUrl`
-- takes `siteId`
-- opens a floating chat panel
-- sends messages to `POST /chat`
-
-It now surfaces backend error messages more clearly, which helps when:
-
-- `siteId` is invalid
-- the site has not been indexed successfully
-- crawling/extraction found no usable content
-
-## Joomla Embedding
-
-Basic Joomla installation path for this MVP:
-
-1. host `chat-widget.js` on a Webaction-controlled URL
-2. place the script tags in the Joomla template or a custom HTML/module area
-3. use the correct `siteId` for that client
-4. point `apiUrl` to the Webaction backend
+- `widgetUrl`
+- `apiUrl`
+- `embedCode`
 
 Example:
 
+```env
+PUBLIC_BASE_URL=https://ai.webaction.ca
+```
+
+## Joomla Embed Pattern
+
 ```html
-<script src="https://your-domain.example/chat-widget.js"></script>
+<script src="https://YOUR_BACKEND_DOMAIN/widget/chat-widget.js"></script>
 <script>
-  WebactionChat.init({
-    apiUrl: "https://chat-api.your-domain.example",
-    siteId: "client-001",
-    title: "Assistant"
-  });
+WebactionChat.init({
+  apiUrl: "https://YOUR_BACKEND_DOMAIN",
+  siteId: "client-001",
+  title: "Assistant"
+});
 </script>
 ```
-
-## Local Development
-
-Install dependencies:
-
-```bash
-cd backend
-npm install
-```
-
-Run the backend:
-
-```bash
-cd backend
-npm start
-```
-
-Index a site:
-
-```bash
-curl -X POST http://localhost:3000/index-site \
-  -H "Content-Type: application/json" \
-  -d '{"siteId":"client-001"}'
-```
-
-Ask a site-specific question:
-
-```bash
-curl -X POST http://localhost:3000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What services do you offer?","siteId":"client-001"}'
-```
-
-## Future Production Improvements
-
-Likely next steps after this MVP:
-
-- embeddings-based retrieval
-- pgvector or Supabase-backed storage
-- persistent crawl/index jobs
-- better sitemap handling
-- richer extraction for Joomla and WordPress layouts
-- source citations in the widget UI
-- conversation persistence and analytics

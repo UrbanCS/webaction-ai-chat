@@ -1,7 +1,7 @@
-const sites = require("../data/sites");
 const { crawlSite } = require("./siteCrawler");
 const { extractTextFromHtml } = require("./contentExtraction");
 const { chunkPages } = require("./chunking");
+const { findSiteBySiteId } = require("./siteRegistryService");
 
 const siteIndexCache = new Map();
 const DEFAULT_TOP_CHUNKS = 4;
@@ -77,8 +77,8 @@ function buildSiteIndex(siteId, siteConfig, crawlResult) {
   const chunks = chunkPages(pages);
   const index = {
     siteId,
-    siteName: siteConfig.name,
-    siteUrl: siteConfig.url,
+    siteName: siteConfig.siteName,
+    siteUrl: siteConfig.siteUrl,
     pages,
     chunks,
     indexedAt: new Date().toISOString()
@@ -90,14 +90,14 @@ function buildSiteIndex(siteId, siteConfig, crawlResult) {
 }
 
 async function indexSite(siteId, options = {}) {
-  const siteConfig = sites[siteId];
+  const siteConfig = findSiteBySiteId(siteId);
   if (!siteConfig) {
     const error = new Error(`Unknown siteId: ${siteId}`);
     error.statusCode = 404;
     throw error;
   }
 
-  const crawlResult = await crawlSite(siteConfig.url, options);
+  const crawlResult = await crawlSite(siteConfig.siteUrl, options);
   const index = buildSiteIndex(siteId, siteConfig, crawlResult);
 
   return {
@@ -111,14 +111,14 @@ async function indexSite(siteId, options = {}) {
 }
 
 function getSiteIndexStatus(siteId) {
-  const siteConfig = sites[siteId];
+  const siteConfig = findSiteBySiteId(siteId);
   const cachedIndex = siteIndexCache.get(siteId);
 
   return {
     siteId,
     configured: Boolean(siteConfig),
-    siteName: siteConfig?.name || null,
-    siteUrl: siteConfig?.url || null,
+    siteName: siteConfig?.siteName || null,
+    siteUrl: siteConfig?.siteUrl || null,
     indexed: Boolean(cachedIndex),
     indexedAt: cachedIndex?.indexedAt || null,
     pageCount: cachedIndex?.pages.length || 0,
