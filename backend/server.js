@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const OpenAI = require("openai");
+const path = require("path");
 const sites = require("./data/sites");
 const {
   getSiteIndexStatus,
@@ -13,6 +14,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const widgetDirectory = path.join(__dirname, "..", "widget");
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is required in backend/.env");
@@ -24,6 +26,7 @@ const openai = new OpenAI({
 
 app.use(cors());
 app.use(express.json());
+app.use("/widget", express.static(widgetDirectory));
 
 app.get("/health", (_req, res) => {
   res.json({

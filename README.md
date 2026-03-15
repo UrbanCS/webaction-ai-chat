@@ -68,6 +68,12 @@ Default API URL:
 http://localhost:3000
 ```
 
+The widget is also served by the backend at:
+
+```text
+http://localhost:3000/widget/chat-widget.js
+```
+
 ## Index A Site
 
 Index a configured site into the in-memory cache:
@@ -111,13 +117,28 @@ The backend will:
 
 ## Embed The Widget
 
-Host `widget/chat-widget.js` on a public URL, then embed it on a client website:
+The backend serves the embeddable widget publicly at `/widget/chat-widget.js`, so a client website can load it directly from the backend domain.
+
+Local example:
 
 ```html
-<script src="https://your-domain.example/chat-widget.js"></script>
+<script src="http://localhost:3000/widget/chat-widget.js"></script>
 <script>
   WebactionChat.init({
     apiUrl: "http://localhost:3000",
+    siteId: "client-001",
+    title: "Assistant"
+  });
+</script>
+```
+
+Public/Joomla-ready example:
+
+```html
+<script src="https://YOUR_BACKEND_DOMAIN/widget/chat-widget.js"></script>
+<script>
+  WebactionChat.init({
+    apiUrl: "https://YOUR_BACKEND_DOMAIN",
     siteId: "client-001",
     title: "Assistant"
   });
