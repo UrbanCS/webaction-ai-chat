@@ -119,12 +119,22 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
 
   const sites = loadSites();
   const normalizedUrl = normalizeSiteUrl(siteUrl);
+  const normalizedSupportEmail = normalizeRequiredEmail(supportEmail, "supportEmail");
   const existingSite = sites.find((site) => site.siteUrl === normalizedUrl);
 
   if (existingSite) {
+    const updatedSite = {
+      ...existingSite,
+      siteName: siteName.trim(),
+      supportEmail: normalizedSupportEmail
+    };
+    const updatedSites = sites.map((site) => (site.siteId === updatedSite.siteId ? updatedSite : site));
+    saveSites(updatedSites);
+
     return {
-      site: existingSite,
-      created: false
+      site: updatedSite,
+      created: false,
+      updated: true
     };
   }
 
@@ -132,7 +142,7 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
     siteId: generateNextSiteId(sites),
     siteName: siteName.trim(),
     siteUrl: normalizedUrl,
-    supportEmail: normalizeRequiredEmail(supportEmail, "supportEmail"),
+    supportEmail: normalizedSupportEmail,
     createdAt: new Date().toISOString()
   };
 
@@ -141,7 +151,8 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
 
   return {
     site,
-    created: true
+    created: true,
+    updated: false
   };
 }
 

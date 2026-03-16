@@ -127,7 +127,7 @@ app.post("/register-site", async (req, res) => {
   try {
     const normalizedSiteUrl = normalizeSiteUrl(siteUrlInput);
     const normalizedSupportEmail = normalizeRequiredEmail(supportEmailInput, "supportEmail");
-    const { site } = createSiteEntry({
+    const { site, created, updated } = createSiteEntry({
       siteName,
       siteUrl: normalizedSiteUrl,
       supportEmail: normalizedSupportEmail
@@ -138,6 +138,8 @@ app.post("/register-site", async (req, res) => {
 
     return res.json({
       siteId: site.siteId,
+      created,
+      updated,
       siteName: site.siteName,
       siteUrl: site.siteUrl,
       supportEmail: site.supportEmail,
