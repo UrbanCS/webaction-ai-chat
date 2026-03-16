@@ -14,12 +14,14 @@ const {
   listSites,
   normalizeSiteUrl
 } = require("./services/siteRegistryService");
+const { createHandoffRequest } = require("./services/humanHandoffService");
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
+const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is required in backend/.env");
@@ -48,6 +50,27 @@ WebactionChat.init({
   title: "Assistant"
 });
 </script>`;
+}
+
+function getHumanFallbackPayload(site) {
+  return {
+    enabled: true,
+    contactEmail: humanFallbackEmail || null,
+    message:
+      "If you want, I can pass your request to a human team member for follow-up.",
+    endpoint: "/human-handoff",
+    siteId: site.siteId
+  };
+}
+
+function shouldSuggestHumanFallback(reply, retrievalResult) {
+  if (!retrievalResult || retrievalResult.site.chunkCount === 0) {
+    return true;
+  }
+
+  return /not found on the website|not found on the site|could not find|couldn't find|information .* not found/i.test(
+    reply || ""
+  );
 }
 
 app.get("/health", (_req, res) => {
@@ -146,6 +169,42 @@ app.get("/site-index/:siteId", (req, res) => {
   return res.json(summary);
 });
 
+app.post("/human-handoff", (req, res) => {
+  const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
+  const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
+  const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
+  const site = findSiteBySiteId(siteId);
+
+  if (!site) {
+    return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
+  }
+
+  try {
+    const request = createHandoffRequest({
+      siteId,
+      siteName: site.siteName,
+      siteUrl: site.siteUrl,
+      message,
+      email,
+      name,
+      pageUrl
+    });
+
+    return res.json({
+      ok: true,
+      requestId: request.id,
+      reply:
+        "Your request has been sent for human follow-up. Someone from the team can contact you using the email you provided."
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to create human handoff request"
+    });
+  }
+});
+
 app.post("/chat", async (req, res) => {
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
@@ -158,7 +217,9 @@ app.post("/chat", async (req, res) => {
     return res.status(400).json({ error: "siteId is required" });
   }
 
-  if (!findSiteBySiteId(siteId)) {
+  const site = findSiteBySiteId(siteId);
+
+  if (!site) {
     return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
   }
 
@@ -174,7 +235,9 @@ app.post("/chat", async (req, res) => {
       return res.json({
         reply:
           "I could not find enough website content for this site yet. Please run indexing or check the site crawl target.",
-        sources: []
+        sources: [],
+        handoffSuggested: true,
+        humanHandoff: getHumanFallbackPayload(site)
       });
     }
 
@@ -213,9 +276,13 @@ app.post("/chat", async (req, res) => {
       return res.status(502).json({ error: "No reply returned from OpenAI" });
     }
 
+    const handoffSuggested = shouldSuggestHumanFallback(reply, retrievalResult);
+
     return res.json({
       reply,
-      sources: retrievalResult.chunks.map((chunk) => chunk.url)
+      sources: retrievalResult.chunks.map((chunk) => chunk.url),
+      handoffSuggested,
+      humanHandoff: handoffSuggested ? getHumanFallbackPayload(site) : null
     });
   } catch (error) {
     console.error("Chat request failed:", error);

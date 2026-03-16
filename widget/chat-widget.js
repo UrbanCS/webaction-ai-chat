@@ -28,6 +28,7 @@
       ".wa-chat-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;background:#fff}" +
       ".wa-chat-input{flex:1;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}" +
       ".wa-chat-send{border:none;background:#0f766e;color:#fff;border-radius:10px;padding:0 14px;cursor:pointer}" +
+      ".wa-chat-handoff{margin:0 14px 12px;padding:10px 12px;border:1px solid #0f766e;background:#ecfdf5;color:#0f766e;border-radius:10px;cursor:pointer;font-size:13px}" +
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:70vh;right:0}}";
     document.head.appendChild(style);
     stylesInjected = true;
@@ -44,6 +45,16 @@
     message.appendChild(bubble);
 
     return message;
+  }
+
+  function createHandoffButton(onClick) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "wa-chat-handoff wa-chat-hidden";
+    button.textContent = "Contact a human";
+    button.addEventListener("click", onClick);
+
+    return button;
   }
 
   function init(userConfig) {
@@ -83,6 +94,8 @@
 
     var form = document.createElement("form");
     form.className = "wa-chat-form";
+    var lastUserMessage = "";
+    var currentHandoff = null;
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -94,11 +107,56 @@
     send.type = "submit";
     send.textContent = "Send";
 
+    var handoffButton = createHandoffButton(function () {
+      if (!currentHandoff || !lastUserMessage) {
+        return;
+      }
+
+      var email = window.prompt("Enter your email so a human can follow up with you:");
+      if (!email) {
+        return;
+      }
+
+      fetch(config.apiUrl.replace(/\/$/, "") + currentHandoff.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          siteId: config.siteId,
+          message: lastUserMessage,
+          email: email,
+          pageUrl: window.location.href
+        })
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "Human handoff request failed.");
+            }
+
+            return data;
+          });
+        })
+        .then(function (data) {
+          appendMessage("ai", data.reply || "A human follow-up request has been sent.");
+          currentHandoff = null;
+          handoffButton.classList.add("wa-chat-hidden");
+        })
+        .catch(function (error) {
+          appendMessage(
+            "ai",
+            error && error.message ? error.message : "Could not request human follow-up."
+          );
+        });
+    });
+
     form.appendChild(input);
     form.appendChild(send);
 
     windowEl.appendChild(header);
     windowEl.appendChild(messages);
+    windowEl.appendChild(handoffButton);
     windowEl.appendChild(form);
 
     root.appendChild(windowEl);
@@ -125,6 +183,9 @@
         return;
       }
 
+      lastUserMessage = message;
+      currentHandoff = null;
+      handoffButton.classList.add("wa-chat-hidden");
       appendMessage("user", message);
       input.value = "";
       input.disabled = true;
@@ -151,6 +212,10 @@
         })
         .then(function (data) {
           appendMessage("ai", data.reply || "No reply returned.");
+          if (data.handoffSuggested && data.humanHandoff) {
+            currentHandoff = data.humanHandoff;
+            handoffButton.classList.remove("wa-chat-hidden");
+          }
         })
         .catch(function (error) {
           appendMessage(

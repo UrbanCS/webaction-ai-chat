@@ -63,6 +63,7 @@ It is responsible for:
 - `GET /sites/:siteId`
 - `POST /index-site`
 - `GET /site-index/:siteId`
+- `POST /human-handoff`
 - `POST /chat`
 - `GET /health`
 
@@ -86,6 +87,18 @@ After a site is registered:
 4. chunks are cached in memory
 5. `/chat` retrieves relevant chunks
 6. OpenAI answers from that retrieved context
+
+## Human Fallback Flow
+
+When the backend determines that the answer was not reliably found on the website, it can suggest a human fallback.
+
+For this MVP:
+
+- `/chat` can return `handoffSuggested`
+- the widget can show a "Contact a human" action
+- `POST /human-handoff` stores the follow-up request in a local JSON file
+
+This keeps the fallback simple and replaceable until a real email, CRM, or ticketing integration is added.
 
 ## PUBLIC_BASE_URL
 

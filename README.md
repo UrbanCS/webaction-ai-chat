@@ -32,6 +32,7 @@ Then create `backend/.env` and set:
 OPENAI_API_KEY=your_openai_api_key_here
 PORT=3000
 PUBLIC_BASE_URL=http://localhost:3000
+HUMAN_FALLBACK_EMAIL=support@example.com
 ```
 
 `PUBLIC_BASE_URL` is optional. When set, it is used to generate:
@@ -39,6 +40,8 @@ PUBLIC_BASE_URL=http://localhost:3000
 - `widgetUrl`
 - `apiUrl`
 - `embedCode`
+
+`HUMAN_FALLBACK_EMAIL` is optional. When set, the app can offer a human follow-up path when the AI does not find a reliable site-based answer.
 
 ## Run
 
@@ -133,6 +136,16 @@ curl -X POST http://localhost:3000/chat \
   -d '{"message":"What services do you offer?","siteId":"client-001"}'
 ```
 
+If the AI cannot find a reliable answer from the site content, the response can include a human fallback suggestion.
+
+Create a human follow-up request directly:
+
+```bash
+curl -X POST http://localhost:3000/human-handoff \
+  -H "Content-Type: application/json" \
+  -d '{"siteId":"client-001","message":"I need help with pricing","email":"visitor@example.com"}'
+```
+
 ## Get Embed Code
 
 `POST /register-site` returns an `embedCode` field. Example:
@@ -171,6 +184,7 @@ Place the script in the Joomla template or a custom HTML/module area.
 
 - site storage is JSON-file based
 - cache is in-memory only and resets on restart
+- human handoff requests are stored locally in JSON
 - no auth or admin dashboard
 - retrieval uses simple keyword overlap, not embeddings
 - crawling and extraction are intentionally lightweight
