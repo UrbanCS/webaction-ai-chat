@@ -33,6 +33,8 @@ OPENAI_API_KEY=your_openai_api_key_here
 PORT=3000
 PUBLIC_BASE_URL=http://localhost:3000
 HUMAN_FALLBACK_EMAIL=support@example.com
+HUMAN_AGENT_AVAILABLE=false
+HUMAN_AGENT_LABEL=Webaction support
 ```
 
 `PUBLIC_BASE_URL` is optional. When set, it is used to generate:
@@ -42,6 +44,8 @@ HUMAN_FALLBACK_EMAIL=support@example.com
 - `embedCode`
 
 `HUMAN_FALLBACK_EMAIL` is optional. When set, the app can offer a human follow-up path when the AI does not find a reliable site-based answer.
+
+`HUMAN_AGENT_AVAILABLE` controls whether the widget should present the fallback as "talk to a person now" or as a request form for later follow-up.
 
 ## Run
 
@@ -137,6 +141,13 @@ curl -X POST http://localhost:3000/chat \
 ```
 
 If the AI cannot find a reliable answer from the site content, the response can include a human fallback suggestion.
+
+The widget flow is:
+
+1. AI answers instantly when it can
+2. if no reliable answer is found, the widget offers human help
+3. if `HUMAN_AGENT_AVAILABLE=true`, the visitor can request a person now
+4. if no agent is available, the widget shows a request form
 
 Create a human follow-up request directly:
 

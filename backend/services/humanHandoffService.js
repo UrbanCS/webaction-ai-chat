@@ -26,7 +26,7 @@ function saveHandoffRequests(requests) {
   fs.writeFileSync(handoffFilePath, `${JSON.stringify(requests, null, 2)}\n`, "utf8");
 }
 
-function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name, pageUrl }) {
+function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name, pageUrl, mode }) {
   if (!siteId) {
     const error = new Error("siteId is required");
     error.statusCode = 400;
@@ -58,6 +58,7 @@ function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name,
     siteId,
     siteName: siteName || null,
     siteUrl: siteUrl || null,
+    mode: mode === "live" ? "live" : "request",
     message: message.trim(),
     email: normalizedEmail,
     name: typeof name === "string" && name.trim() ? name.trim() : null,

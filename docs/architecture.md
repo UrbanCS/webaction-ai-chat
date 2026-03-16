@@ -95,7 +95,8 @@ When the backend determines that the answer was not reliably found on the websit
 For this MVP:
 
 - `/chat` can return `handoffSuggested`
-- the widget can show a "Contact a human" action
+- the widget can offer talking to a person or a request form
+- `GET /human-support-status` exposes whether an agent is marked available
 - `POST /human-handoff` stores the follow-up request in a local JSON file
 
 This keeps the fallback simple and replaceable until a real email, CRM, or ticketing integration is added.

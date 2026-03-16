@@ -22,6 +22,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
 const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
+const humanAgentAvailable = String(process.env.HUMAN_AGENT_AVAILABLE || "false").toLowerCase() === "true";
+const humanAgentLabel = process.env.HUMAN_AGENT_LABEL || "Webaction support";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is required in backend/.env");
@@ -55,10 +57,14 @@ WebactionChat.init({
 function getHumanFallbackPayload(site) {
   return {
     enabled: true,
+    agentAvailable: humanAgentAvailable,
+    agentLabel: humanAgentLabel,
     contactEmail: humanFallbackEmail || null,
-    message:
-      "If you want, I can pass your request to a human team member for follow-up.",
+    message: humanAgentAvailable
+      ? "A person appears to be available. You can ask for human help now."
+      : "If you want, I can send your request to a human team member for follow-up.",
     endpoint: "/human-handoff",
+    statusEndpoint: "/human-support-status",
     siteId: site.siteId
   };
 }
@@ -169,12 +175,21 @@ app.get("/site-index/:siteId", (req, res) => {
   return res.json(summary);
 });
 
+app.get("/human-support-status", (_req, res) => {
+  return res.json({
+    available: humanAgentAvailable,
+    agentLabel: humanAgentLabel,
+    contactEmail: humanFallbackEmail || null
+  });
+});
+
 app.post("/human-handoff", (req, res) => {
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
   const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
+  const mode = typeof req.body.mode === "string" ? req.body.mode.trim() : "";
   const site = findSiteBySiteId(siteId);
 
   if (!site) {
@@ -189,14 +204,16 @@ app.post("/human-handoff", (req, res) => {
       message,
       email,
       name,
-      pageUrl
+      pageUrl,
+      mode
     });
 
     return res.json({
       ok: true,
       requestId: request.id,
-      reply:
-        "Your request has been sent for human follow-up. Someone from the team can contact you using the email you provided."
+      reply: request.mode === "live"
+        ? "Your request to speak with a person has been sent. A team member can follow up using the email you provided."
+        : "Your request has been sent for human follow-up. Someone from the team can contact you using the email you provided."
     });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
