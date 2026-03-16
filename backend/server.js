@@ -18,16 +18,28 @@ const {
 } = require("./services/siteRegistryService");
 const { createHandoffRequest } = require("./services/humanHandoffService");
 const { sendHumanHandoffEmail } = require("./services/emailService");
+const {
+  addMessageToConversation,
+  closeConversation,
+  createConversation,
+  findConversationById,
+  getAgentStatus,
+  getConversationMessages,
+  listConversations,
+  setAgentStatus
+} = require("./services/liveChatService");
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
+const agentUiDirectory = path.join(__dirname, "public", "agent");
 const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
 const defaultSupportEmail = process.env.DEFAULT_SUPPORT_EMAIL || humanFallbackEmail || "";
-const humanAgentAvailable = String(process.env.HUMAN_AGENT_AVAILABLE || "false").toLowerCase() === "true";
+const humanAgentAvailableDefault = String(process.env.HUMAN_AGENT_AVAILABLE || "false").toLowerCase() === "true";
 const humanAgentLabel = process.env.HUMAN_AGENT_LABEL || "Webaction support";
+const agentDashboardKey = process.env.AGENT_DASHBOARD_KEY || "";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is required in backend/.env");
@@ -40,6 +52,7 @@ const openai = new OpenAI({
 app.use(cors());
 app.use(express.json());
 app.use("/widget", express.static(widgetDirectory));
+app.use("/agent", express.static(agentUiDirectory));
 
 app.set("trust proxy", true);
 
@@ -58,16 +71,36 @@ WebactionChat.init({
 </script>`;
 }
 
+function isAgentAuthorized(req) {
+  if (!agentDashboardKey) {
+    return true;
+  }
+
+  const providedKey = req.get("x-agent-key") || req.query.key || "";
+  return providedKey === agentDashboardKey;
+}
+
+function requireAgentAuth(req, res, next) {
+  if (!isAgentAuthorized(req)) {
+    return res.status(401).json({ error: "Agent authorization required" });
+  }
+
+  return next();
+}
+
 function getHumanFallbackPayload(site) {
+  const agentStatus = getAgentStatus();
+
   return {
     enabled: true,
-    agentAvailable: humanAgentAvailable,
+    agentAvailable: agentStatus.available,
     agentLabel: humanAgentLabel,
     contactEmail: humanFallbackEmail || null,
-    message: humanAgentAvailable
+    message: agentStatus.available
       ? "A person appears to be available. You can ask for human help now."
       : "If you want, I can send your request to a human team member for follow-up.",
     endpoint: "/human-handoff",
+    liveStartEndpoint: "/live-chat/start",
     statusEndpoint: "/human-support-status",
     siteId: site.siteId
   };
@@ -190,11 +223,170 @@ app.get("/site-index/:siteId", (req, res) => {
 });
 
 app.get("/human-support-status", (_req, res) => {
+  const agentStatus = getAgentStatus();
+
   return res.json({
-    available: humanAgentAvailable,
+    available: agentStatus.available,
     agentLabel: humanAgentLabel,
-    contactEmail: humanFallbackEmail || null
+    contactEmail: humanFallbackEmail || null,
+    updatedAt: agentStatus.updatedAt
   });
+});
+
+app.post("/live-chat/start", (req, res) => {
+  const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
+  const visitorName = typeof req.body.visitorName === "string" ? req.body.visitorName.trim() : "";
+  const visitorEmail = typeof req.body.visitorEmail === "string" ? req.body.visitorEmail.trim() : "";
+  const initialMessage = typeof req.body.message === "string" ? req.body.message.trim() : "";
+  const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
+  const site = findSiteBySiteId(siteId);
+  const agentStatus = getAgentStatus();
+
+  if (!site) {
+    return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
+  }
+
+  if (!agentStatus.available) {
+    return res.status(409).json({
+      error: "No live agent is available right now"
+    });
+  }
+
+  try {
+    const conversation = createConversation({
+      siteId,
+      siteName: site.siteName,
+      siteUrl: site.siteUrl,
+      visitorName,
+      visitorEmail,
+      pageUrl,
+      initialMessage
+    });
+
+    addMessageToConversation(conversation.id, {
+      senderType: "system",
+      text: `${humanAgentLabel} joined the request queue. An agent can reply here shortly.`
+    });
+
+    return res.json({
+      ok: true,
+      conversationId: conversation.id,
+      status: conversation.status,
+      messages: conversation.messages
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to start live chat"
+    });
+  }
+});
+
+app.get("/live-chat/:conversationId/messages", (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+  const since = typeof req.query.since === "string" ? req.query.since.trim() : "";
+
+  try {
+    const result = getConversationMessages(conversationId, since);
+    return res.json({
+      conversationId,
+      status: result.conversation.status,
+      updatedAt: result.conversation.updatedAt,
+      messages: result.messages
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to load live chat messages"
+    });
+  }
+});
+
+app.post("/live-chat/:conversationId/messages", (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+  const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+
+  try {
+    const result = addMessageToConversation(conversationId, {
+      senderType: "visitor",
+      text
+    });
+
+    return res.json({
+      ok: true,
+      message: result.message,
+      status: result.conversation.status
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to send visitor message"
+    });
+  }
+});
+
+app.get("/agent/live-chat/conversations", requireAgentAuth, (_req, res) => {
+  return res.json({
+    available: getAgentStatus().available,
+    conversations: listConversations()
+  });
+});
+
+app.post("/agent/live-chat/availability", requireAgentAuth, (req, res) => {
+  const available = Boolean(req.body.available);
+  const status = setAgentStatus(available);
+
+  return res.json(status);
+});
+
+app.get("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+
+  try {
+    const result = getConversationMessages(conversationId);
+    return res.json({
+      conversationId,
+      conversation: result.conversation
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to load conversation"
+    });
+  }
+});
+
+app.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+  const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+
+  try {
+    const result = addMessageToConversation(conversationId, {
+      senderType: "agent",
+      text
+    });
+
+    return res.json({
+      ok: true,
+      message: result.message
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to send agent message"
+    });
+  }
+});
+
+app.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+
+  try {
+    const conversation = closeConversation(conversationId);
+    return res.json({
+      ok: true,
+      conversation
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to close conversation"
+    });
+  }
 });
 
 app.post("/human-handoff", async (req, res) => {

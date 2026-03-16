@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webaction Agent Chat</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar, .main {
+      padding: 20px;
+    }
+    .sidebar {
+      border-right: 1px solid #cbd5e1;
+      background: #ffffff;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .conversation-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .conversation-item {
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #f8fafc;
+      cursor: pointer;
+    }
+    .conversation-item.active {
+      border-color: #0f766e;
+      background: #ecfdf5;
+    }
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+    .message {
+      padding: 10px 12px;
+      border-radius: 12px;
+      max-width: 70%;
+      white-space: pre-wrap;
+    }
+    .message.agent {
+      align-self: flex-end;
+      background: #0f766e;
+      color: white;
+    }
+    .message.visitor {
+      align-self: flex-start;
+      background: #e2e8f0;
+    }
+    .message.system {
+      align-self: center;
+      background: #fef3c7;
+    }
+    .composer {
+      display: flex;
+      gap: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      padding: 10px 12px;
+      box-sizing: border-box;
+    }
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #0f766e;
+      color: white;
+      cursor: pointer;
+    }
+    .secondary {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .status {
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid #cbd5e1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="header">
+        <h2>Agent Chat</h2>
+        <button id="toggleAvailability">Go Online</button>
+      </div>
+      <div class="status" id="availabilityStatus">Loading agent status...</div>
+      <div class="conversation-list" id="conversationList"></div>
+    </aside>
+    <main class="main">
+      <h2 id="conversationTitle">Select a conversation</h2>
+      <div class="messages" id="messages"></div>
+      <div class="composer">
+        <textarea id="replyText" placeholder="Write a reply..."></textarea>
+      </div>
+      <div class="composer" style="margin-top: 8px;">
+        <button id="sendReply">Send</button>
+        <button class="secondary" id="closeConversation">Close conversation</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var agentKey = window.prompt("Enter the agent dashboard key:");
+      var activeConversationId = null;
+      var activeConversation = null;
+
+      function api(path, options) {
+        var requestOptions = options || {};
+        requestOptions.headers = Object.assign({}, requestOptions.headers || {}, {
+          "Content-Type": "application/json",
+          "x-agent-key": agentKey || ""
+        });
+
+        return fetch(path, requestOptions).then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "Request failed.");
+            }
+
+            return data;
+          });
+        });
+      }
+
+      function renderMessages(messages) {
+        var container = document.getElementById("messages");
+        container.innerHTML = "";
+
+        messages.forEach(function (message) {
+          var el = document.createElement("div");
+          el.className = "message " + message.senderType;
+          el.textContent = message.text;
+          container.appendChild(el);
+        });
+
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function renderConversationList(conversations) {
+        var list = document.getElementById("conversationList");
+        list.innerHTML = "";
+
+        conversations
+          .slice()
+          .sort(function (a, b) {
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          })
+          .forEach(function (conversation) {
+            var item = document.createElement("button");
+            item.type = "button";
+            item.className = "conversation-item" + (conversation.id === activeConversationId ? " active" : "");
+            item.innerHTML =
+              "<strong>" + (conversation.siteName || conversation.siteId) + "</strong><br>" +
+              (conversation.visitorEmail || "No email") + "<br>" +
+              "Status: " + conversation.status;
+            item.addEventListener("click", function () {
+              loadConversation(conversation.id);
+            });
+            list.appendChild(item);
+          });
+      }
+
+      function refreshConversations() {
+        return api("/agent/live-chat/conversations").then(function (data) {
+          document.getElementById("availabilityStatus").textContent = data.available
+            ? "Agent status: Online"
+            : "Agent status: Offline";
+          document.getElementById("toggleAvailability").textContent = data.available
+            ? "Go Offline"
+            : "Go Online";
+          renderConversationList(data.conversations || []);
+        });
+      }
+
+      function loadConversation(conversationId) {
+        activeConversationId = conversationId;
+
+        api("/agent/live-chat/" + conversationId + "/messages").then(function (data) {
+          activeConversation = data.conversation;
+          document.getElementById("conversationTitle").textContent =
+            (activeConversation.siteName || activeConversation.siteId) + " - " +
+            (activeConversation.visitorEmail || "No email");
+          renderMessages(activeConversation.messages || []);
+          refreshConversations();
+        });
+      }
+
+      document.getElementById("toggleAvailability").addEventListener("click", function () {
+        var currentlyOnline = document.getElementById("availabilityStatus").textContent.indexOf("Online") !== -1;
+        api("/agent/live-chat/availability", {
+          method: "POST",
+          body: JSON.stringify({ available: !currentlyOnline })
+        }).then(refreshConversations);
+      });
+
+      document.getElementById("sendReply").addEventListener("click", function () {
+        var text = document.getElementById("replyText").value.trim();
+        if (!activeConversationId || !text) {
+          return;
+        }
+
+        api("/agent/live-chat/" + activeConversationId + "/messages", {
+          method: "POST",
+          body: JSON.stringify({ text: text })
+        }).then(function () {
+          document.getElementById("replyText").value = "";
+          loadConversation(activeConversationId);
+        });
+      });
+
+      document.getElementById("closeConversation").addEventListener("click", function () {
+        if (!activeConversationId) {
+          return;
+        }
+
+        api("/agent/live-chat/" + activeConversationId + "/close", {
+          method: "POST"
+        }).then(function () {
+          activeConversationId = null;
+          activeConversation = null;
+          document.getElementById("conversationTitle").textContent = "Select a conversation";
+          document.getElementById("messages").innerHTML = "";
+          refreshConversations();
+        });
+      });
+
+      refreshConversations();
+      setInterval(function () {
+        refreshConversations();
+        if (activeConversationId) {
+          loadConversation(activeConversationId);
+        }
+      }, 4000);
+    })();
+  </script>
+</body>
+</html>

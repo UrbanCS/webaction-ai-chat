@@ -35,6 +35,7 @@ PUBLIC_BASE_URL=http://localhost:3000
 HUMAN_FALLBACK_EMAIL=support@example.com
 HUMAN_AGENT_AVAILABLE=false
 HUMAN_AGENT_LABEL=Webaction support
+AGENT_DASHBOARD_KEY=change_me
 DEFAULT_SUPPORT_EMAIL=support@example.com
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
@@ -55,6 +56,8 @@ SMTP_FROM=support@example.com
 `HUMAN_AGENT_AVAILABLE` controls whether the widget should present the fallback as "talk to a person now" or as a request form for later follow-up.
 
 `DEFAULT_SUPPORT_EMAIL` is used if a client site does not have its own `supportEmail`.
+
+`AGENT_DASHBOARD_KEY` protects the simple live-chat agent dashboard.
 
 ## Run
 
@@ -159,6 +162,19 @@ The widget flow is:
 2. if no reliable answer is found, the widget offers human help
 3. if `HUMAN_AGENT_AVAILABLE=true`, the visitor can request a person now
 4. if no agent is available, the widget shows a request form
+
+The agent dashboard is available at:
+
+```text
+/agent/live-chat.html
+```
+
+It lets an authorized agent:
+
+- mark themselves online or offline
+- see open conversations
+- reply in the same chat flow
+- close conversations
 
 Create a human follow-up request directly:
 

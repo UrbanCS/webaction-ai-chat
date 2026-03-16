@@ -24,11 +24,12 @@
       ".wa-chat-message-user{justify-content:flex-end}" +
       ".wa-chat-bubble{max-width:85%;padding:10px 12px;border-radius:14px;line-height:1.4;font-size:14px;white-space:pre-wrap}" +
       ".wa-chat-message-user .wa-chat-bubble{background:#0f766e;color:#fff;border-bottom-right-radius:4px}" +
-      ".wa-chat-message-ai .wa-chat-bubble{background:#e2e8f0;color:#0f172a;border-bottom-left-radius:4px}" +
+      ".wa-chat-message-ai .wa-chat-bubble,.wa-chat-message-agent .wa-chat-bubble{background:#e2e8f0;color:#0f172a;border-bottom-left-radius:4px}" +
+      ".wa-chat-message-system .wa-chat-bubble{background:#fef3c7;color:#78350f}" +
       ".wa-chat-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;background:#fff}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;box-sizing:border-box}" +
       ".wa-chat-input{flex:1}" +
-      ".wa-chat-send,.wa-chat-support-submit,.wa-chat-support-toggle{border:none;background:#0f766e;color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}" +
+      ".wa-chat-send,.wa-chat-support-submit{border:none;background:#0f766e;color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}" +
       ".wa-chat-handoff-panel{margin:0 14px 12px;padding:12px;border:1px solid #cbd5e1;background:#f0fdf4;border-radius:12px}" +
       ".wa-chat-handoff-copy{margin:0 0 10px;font-size:13px;line-height:1.4;color:#14532d}" +
       ".wa-chat-support-form{display:flex;flex-direction:column;gap:8px}" +
@@ -140,6 +141,9 @@
     form.className = "wa-chat-form";
     var lastUserMessage = "";
     var currentHandoff = null;
+    var activeConversationId = null;
+    var livePollTimer = null;
+    var lastLiveMessageAt = "";
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -168,6 +172,13 @@
       messages.scrollTop = messages.scrollHeight;
     }
 
+    function stopLivePolling() {
+      if (livePollTimer) {
+        window.clearInterval(livePollTimer);
+        livePollTimer = null;
+      }
+    }
+
     function hideSupportPanel() {
       currentHandoff = null;
       handoffPanel.classList.add("wa-chat-hidden");
@@ -175,13 +186,63 @@
       supportMessage.value = "";
     }
 
+    function pollLiveMessages() {
+      if (!activeConversationId) {
+        return;
+      }
+
+      var url = config.apiUrl.replace(/\/$/, "") + "/live-chat/" + activeConversationId + "/messages";
+      if (lastLiveMessageAt) {
+        url += "?since=" + encodeURIComponent(lastLiveMessageAt);
+      }
+
+      fetch(url)
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "Could not refresh live chat.");
+            }
+
+            return data;
+          });
+        })
+        .then(function (data) {
+          (data.messages || []).forEach(function (message) {
+            appendMessage(message.senderType, message.text);
+            lastLiveMessageAt = message.createdAt;
+          });
+
+          if (data.status === "closed") {
+            appendMessage("system", "This live conversation has been closed.");
+            activeConversationId = null;
+            stopLivePolling();
+          }
+        })
+        .catch(function () {
+          stopLivePolling();
+        });
+    }
+
+    function startLivePolling(conversationId, initialMessages) {
+      activeConversationId = conversationId;
+      lastLiveMessageAt = "";
+
+      (initialMessages || []).forEach(function (message) {
+        appendMessage(message.senderType, message.text);
+        lastLiveMessageAt = message.createdAt;
+      });
+
+      stopLivePolling();
+      livePollTimer = window.setInterval(pollLiveMessages, 3000);
+    }
+
     function showSupportPanel(handoff) {
       currentHandoff = handoff;
       supportMessage.value = lastUserMessage;
       handoffCopy.textContent = handoff.agentAvailable
-        ? "A person appears to be available. Send your request now and the team can follow up quickly."
+        ? "A person appears to be available. Start a live conversation now."
         : "No agent appears to be available right now. Send your request and the team can contact you later.";
-      supportSubmit.textContent = handoff.agentAvailable ? "Talk to a person" : "Send request";
+      supportSubmit.textContent = handoff.agentAvailable ? "Start live chat" : "Send request";
       handoffPanel.classList.remove("wa-chat-hidden");
     }
 
@@ -203,17 +264,55 @@
         return;
       }
 
+      var email = supportEmail.value.trim();
+      if (!email) {
+        appendMessage("ai", "Please enter your email so the team can follow up.");
+        return;
+      }
+
       var payload = {
         siteId: config.siteId,
         name: supportName.value.trim(),
-        email: supportEmail.value.trim(),
+        email: email,
         message: supportMessage.value.trim() || lastUserMessage,
-        pageUrl: window.location.href,
-        mode: currentHandoff.agentAvailable ? "live" : "request"
+        pageUrl: window.location.href
       };
 
-      if (!payload.email) {
-        appendMessage("ai", "Please enter your email so the team can follow up.");
+      if (currentHandoff.agentAvailable && currentHandoff.liveStartEndpoint) {
+        fetch(config.apiUrl.replace(/\/$/, "") + currentHandoff.liveStartEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            siteId: config.siteId,
+            visitorName: payload.name,
+            visitorEmail: payload.email,
+            message: payload.message,
+            pageUrl: payload.pageUrl
+          })
+        })
+          .then(function (response) {
+            return response.json().then(function (data) {
+              if (!response.ok) {
+                throw new Error(data.error || "Could not start live chat.");
+              }
+
+              return data;
+            });
+          })
+          .then(function (data) {
+            appendMessage("system", "Live chat started. A person can now answer here.");
+            hideSupportPanel();
+            startLivePolling(data.conversationId, data.messages || []);
+          })
+          .catch(function (error) {
+            appendMessage(
+              "ai",
+              error && error.message ? error.message : "Could not start live chat."
+            );
+          });
+
         return;
       }
 
@@ -222,7 +321,14 @@
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          siteId: config.siteId,
+          name: payload.name,
+          email: payload.email,
+          message: payload.message,
+          pageUrl: payload.pageUrl,
+          mode: "request"
+        })
       })
         .then(function (response) {
           return response.json().then(function (data) {
@@ -250,6 +356,38 @@
 
       var message = input.value.trim();
       if (!message) {
+        return;
+      }
+
+      if (activeConversationId) {
+        appendMessage("user", message);
+        input.value = "";
+
+        fetch(config.apiUrl.replace(/\/$/, "") + "/live-chat/" + activeConversationId + "/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            text: message
+          })
+        })
+          .then(function (response) {
+            return response.json().then(function (data) {
+              if (!response.ok) {
+                throw new Error(data.error || "Could not send live chat message.");
+              }
+
+              return data;
+            });
+          })
+          .catch(function (error) {
+            appendMessage(
+              "system",
+              error && error.message ? error.message : "Could not send live chat message."
+            );
+          });
+
         return;
       }
 

@@ -101,6 +101,9 @@ For this MVP:
 - `GET /human-support-status` exposes whether an agent is marked available
 - `POST /human-handoff` stores the follow-up request in a local JSON file
 - `POST /human-handoff` also sends an email to the configured support inbox for that site
+- `/live-chat/start` creates a live conversation when an agent is available
+- the widget polls `/live-chat/:conversationId/messages`
+- `/agent/live-chat.html` provides a simple agent UI for replying
 
 This keeps the fallback simple and replaceable until a real email, CRM, or ticketing integration is added.
 
