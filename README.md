@@ -35,6 +35,13 @@ PUBLIC_BASE_URL=http://localhost:3000
 HUMAN_FALLBACK_EMAIL=support@example.com
 HUMAN_AGENT_AVAILABLE=false
 HUMAN_AGENT_LABEL=Webaction support
+DEFAULT_SUPPORT_EMAIL=support@example.com
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=smtp-user@example.com
+SMTP_PASS=your_smtp_password
+SMTP_FROM=support@example.com
 ```
 
 `PUBLIC_BASE_URL` is optional. When set, it is used to generate:
@@ -46,6 +53,8 @@ HUMAN_AGENT_LABEL=Webaction support
 `HUMAN_FALLBACK_EMAIL` is optional. When set, the app can offer a human follow-up path when the AI does not find a reliable site-based answer.
 
 `HUMAN_AGENT_AVAILABLE` controls whether the widget should present the fallback as "talk to a person now" or as a request form for later follow-up.
+
+`DEFAULT_SUPPORT_EMAIL` is used if a client site does not have its own `supportEmail`.
 
 ## Run
 
@@ -88,7 +97,7 @@ Register a new client website:
 ```bash
 curl -X POST http://localhost:3000/register-site \
   -H "Content-Type: application/json" \
-  -d '{"siteUrl":"https://example.com","siteName":"Example Client"}'
+  -d '{"siteUrl":"https://example.com","siteName":"Example Client","supportEmail":"help@example.com"}'
 ```
 
 The backend will:
@@ -99,6 +108,8 @@ The backend will:
 4. save the entry into `backend/data/sites.json`
 5. automatically index the site
 6. return the widget URL, API URL, and embed code
+
+`supportEmail` is now required for each client registration.
 
 ## List Sites
 
@@ -156,6 +167,12 @@ curl -X POST http://localhost:3000/human-handoff \
   -H "Content-Type: application/json" \
   -d '{"siteId":"client-001","message":"I need help with pricing","email":"visitor@example.com"}'
 ```
+
+When a human handoff request is submitted:
+
+- the backend stores the request locally in JSON
+- the backend sends an email to the client `supportEmail`
+- if no client `supportEmail` is configured, it sends to `DEFAULT_SUPPORT_EMAIL`
 
 ## Get Embed Code
 

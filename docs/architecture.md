@@ -56,6 +56,8 @@ It is responsible for:
 7. The backend immediately indexes the site.
 8. The response returns `siteId`, `widgetUrl`, `apiUrl`, and `embedCode`.
 
+Each site can also store a `supportEmail` so human fallback requests go to the right client inbox.
+
 ## API Routes
 
 - `POST /register-site`
@@ -98,6 +100,7 @@ For this MVP:
 - the widget can offer talking to a person or a request form
 - `GET /human-support-status` exposes whether an agent is marked available
 - `POST /human-handoff` stores the follow-up request in a local JSON file
+- `POST /human-handoff` also sends an email to the configured support inbox for that site
 
 This keeps the fallback simple and replaceable until a real email, CRM, or ticketing integration is added.
 

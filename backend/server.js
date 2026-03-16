@@ -12,9 +12,12 @@ const {
   createSiteEntry,
   findSiteBySiteId,
   listSites,
+  normalizeRequiredEmail,
+  normalizeOptionalEmail,
   normalizeSiteUrl
 } = require("./services/siteRegistryService");
 const { createHandoffRequest } = require("./services/humanHandoffService");
+const { sendHumanHandoffEmail } = require("./services/emailService");
 
 dotenv.config();
 
@@ -22,6 +25,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
 const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
+const defaultSupportEmail = process.env.DEFAULT_SUPPORT_EMAIL || humanFallbackEmail || "";
 const humanAgentAvailable = String(process.env.HUMAN_AGENT_AVAILABLE || "false").toLowerCase() === "true";
 const humanAgentLabel = process.env.HUMAN_AGENT_LABEL || "Webaction support";
 
@@ -106,6 +110,7 @@ app.get("/sites/:siteId", (req, res) => {
 app.post("/register-site", async (req, res) => {
   const siteName = typeof req.body.siteName === "string" ? req.body.siteName.trim() : "";
   const siteUrlInput = typeof req.body.siteUrl === "string" ? req.body.siteUrl.trim() : "";
+  const supportEmailInput = typeof req.body.supportEmail === "string" ? req.body.supportEmail.trim() : "";
 
   if (!siteName) {
     return res.status(400).json({ error: "siteName is required" });
@@ -115,11 +120,17 @@ app.post("/register-site", async (req, res) => {
     return res.status(400).json({ error: "siteUrl is required" });
   }
 
+  if (!supportEmailInput) {
+    return res.status(400).json({ error: "supportEmail is required" });
+  }
+
   try {
     const normalizedSiteUrl = normalizeSiteUrl(siteUrlInput);
+    const normalizedSupportEmail = normalizeRequiredEmail(supportEmailInput, "supportEmail");
     const { site } = createSiteEntry({
       siteName,
-      siteUrl: normalizedSiteUrl
+      siteUrl: normalizedSiteUrl,
+      supportEmail: normalizedSupportEmail
     });
 
     const indexSummary = await indexSite(site.siteId);
@@ -129,6 +140,7 @@ app.post("/register-site", async (req, res) => {
       siteId: site.siteId,
       siteName: site.siteName,
       siteUrl: site.siteUrl,
+      supportEmail: site.supportEmail,
       widgetUrl: `${baseUrl}/widget/chat-widget.js`,
       apiUrl: baseUrl,
       embedCode: buildEmbedCode(baseUrl, site.siteId),
@@ -183,7 +195,7 @@ app.get("/human-support-status", (_req, res) => {
   });
 });
 
-app.post("/human-handoff", (req, res) => {
+app.post("/human-handoff", async (req, res) => {
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
@@ -206,6 +218,35 @@ app.post("/human-handoff", (req, res) => {
       name,
       pageUrl,
       mode
+    });
+
+    const recipientEmail = site.supportEmail || defaultSupportEmail;
+    if (!recipientEmail) {
+      return res.status(500).json({
+        error: "No support email is configured for this site"
+      });
+    }
+
+    const subjectPrefix = request.mode === "live" ? "Live support request" : "Website chat follow-up request";
+    const emailBody = [
+      `${subjectPrefix} for ${site.siteName}`,
+      "",
+      `Site ID: ${site.siteId}`,
+      `Site URL: ${site.siteUrl}`,
+      `Visitor email: ${request.email}`,
+      `Visitor name: ${request.name || "Not provided"}`,
+      `Page URL: ${request.pageUrl || "Not provided"}`,
+      `Request mode: ${request.mode}`,
+      "",
+      "Message:",
+      request.message
+    ].join("\n");
+
+    await sendHumanHandoffEmail({
+      to: recipientEmail,
+      replyTo: request.email,
+      subject: `[Webaction AI Chat] ${subjectPrefix} - ${site.siteName}`,
+      text: emailBody
     });
 
     return res.json({

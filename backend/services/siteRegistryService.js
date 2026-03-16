@@ -83,7 +83,34 @@ function generateNextSiteId(existingSites = loadSites()) {
   return `client-${String(maxId + 1).padStart(3, "0")}`;
 }
 
-function createSiteEntry({ siteUrl, siteName }) {
+function normalizeOptionalEmail(email) {
+  if (typeof email !== "string" || !email.trim()) {
+    return null;
+  }
+
+  const normalizedEmail = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    const error = new Error("supportEmail must be valid");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedEmail;
+}
+
+function normalizeRequiredEmail(email, fieldName) {
+  const normalizedEmail = normalizeOptionalEmail(email);
+
+  if (!normalizedEmail) {
+    const error = new Error(`${fieldName} is required`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedEmail;
+}
+
+function createSiteEntry({ siteUrl, siteName, supportEmail }) {
   if (typeof siteName !== "string" || !siteName.trim()) {
     const error = new Error("siteName is required");
     error.statusCode = 400;
@@ -105,6 +132,7 @@ function createSiteEntry({ siteUrl, siteName }) {
     siteId: generateNextSiteId(sites),
     siteName: siteName.trim(),
     siteUrl: normalizedUrl,
+    supportEmail: normalizeRequiredEmail(supportEmail, "supportEmail"),
     createdAt: new Date().toISOString()
   };
 
@@ -124,6 +152,8 @@ module.exports = {
   generateNextSiteId,
   listSites,
   loadSites,
+  normalizeRequiredEmail,
   normalizeSiteUrl,
+  normalizeOptionalEmail,
   saveSites
 };
