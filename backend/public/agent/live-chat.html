@@ -139,6 +139,7 @@
       var agentKey = window.prompt("Enter the agent dashboard key:");
       var activeConversationId = null;
       var activeConversation = null;
+      var basePath = window.location.pathname.replace(/\/agent\/live-chat\.html$/, "");
 
       function api(path, options) {
         var requestOptions = options || {};
@@ -147,7 +148,7 @@
           "x-agent-key": agentKey || ""
         });
 
-        return fetch(path, requestOptions).then(function (response) {
+        return fetch(basePath + path, requestOptions).then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
               throw new Error(data.error || "Request failed.");
