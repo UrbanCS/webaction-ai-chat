@@ -144,6 +144,7 @@
     var activeConversationId = null;
     var livePollTimer = null;
     var lastLiveMessageAt = "";
+    var seenLiveMessageIds = {};
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -170,6 +171,22 @@
     function appendMessage(role, text) {
       messages.appendChild(createMessage(role, text));
       messages.scrollTop = messages.scrollHeight;
+    }
+
+    function appendLiveMessage(message, options) {
+      var settings = options || {};
+      if (!message || !message.id || seenLiveMessageIds[message.id]) {
+        return;
+      }
+
+      seenLiveMessageIds[message.id] = true;
+      lastLiveMessageAt = message.createdAt || lastLiveMessageAt;
+
+      if (settings.skipVisitorMessages && message.senderType === "visitor") {
+        return;
+      }
+
+      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, message.text);
     }
 
     function stopLivePolling() {
@@ -208,8 +225,7 @@
         })
         .then(function (data) {
           (data.messages || []).forEach(function (message) {
-            appendMessage(message.senderType, message.text);
-            lastLiveMessageAt = message.createdAt;
+            appendLiveMessage(message, { skipVisitorMessages: true });
           });
 
           if (data.status === "closed") {
@@ -226,10 +242,10 @@
     function startLivePolling(conversationId, initialMessages) {
       activeConversationId = conversationId;
       lastLiveMessageAt = "";
+      seenLiveMessageIds = {};
 
       (initialMessages || []).forEach(function (message) {
-        appendMessage(message.senderType, message.text);
-        lastLiveMessageAt = message.createdAt;
+        appendLiveMessage(message);
       });
 
       stopLivePolling();
@@ -380,6 +396,12 @@
 
               return data;
             });
+          })
+          .then(function (data) {
+            if (data.message && data.message.id) {
+              seenLiveMessageIds[data.message.id] = true;
+              lastLiveMessageAt = data.message.createdAt || lastLiveMessageAt;
+            }
           })
           .catch(function (error) {
             appendMessage(
