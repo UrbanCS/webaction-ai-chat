@@ -35,6 +35,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
 const agentUiDirectory = path.join(__dirname, "public", "agent");
+const apiRouter = express.Router();
 const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
 const defaultSupportEmail = process.env.DEFAULT_SUPPORT_EMAIL || humanFallbackEmail || "";
 const humanAgentAvailableDefault = String(process.env.HUMAN_AGENT_AVAILABLE || "false").toLowerCase() === "true";
@@ -51,13 +52,26 @@ const openai = new OpenAI({
 
 app.use(cors());
 app.use(express.json());
-app.use("/widget", express.static(widgetDirectory));
-app.use("/agent", express.static(agentUiDirectory));
 
 app.set("trust proxy", true);
 
 function getBaseUrl(req) {
   return (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+}
+
+function getBasePath() {
+  const configuredBaseUrl = process.env.PUBLIC_BASE_URL || "";
+
+  if (!configuredBaseUrl) {
+    return "";
+  }
+
+  try {
+    const pathname = new URL(configuredBaseUrl).pathname.replace(/\/$/, "");
+    return pathname === "/" ? "" : pathname;
+  } catch (_error) {
+    return "";
+  }
 }
 
 function buildEmbedCode(baseUrl, siteId) {
@@ -116,18 +130,21 @@ function shouldSuggestHumanFallback(reply, retrievalResult) {
   );
 }
 
-app.get("/health", (_req, res) => {
+apiRouter.use("/widget", express.static(widgetDirectory));
+apiRouter.use("/agent", express.static(agentUiDirectory));
+
+apiRouter.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "webaction-ai-chat-backend"
   });
 });
 
-app.get("/sites", (_req, res) => {
+apiRouter.get("/sites", (_req, res) => {
   res.json(listSites());
 });
 
-app.get("/sites/:siteId", (req, res) => {
+apiRouter.get("/sites/:siteId", (req, res) => {
   const siteId = typeof req.params.siteId === "string" ? req.params.siteId.trim() : "";
   const site = findSiteBySiteId(siteId);
 
@@ -140,7 +157,7 @@ app.get("/sites/:siteId", (req, res) => {
   return res.json(site);
 });
 
-app.post("/register-site", async (req, res) => {
+apiRouter.post("/register-site", async (req, res) => {
   const siteName = typeof req.body.siteName === "string" ? req.body.siteName.trim() : "";
   const siteUrlInput = typeof req.body.siteUrl === "string" ? req.body.siteUrl.trim() : "";
   const supportEmailInput = typeof req.body.supportEmail === "string" ? req.body.supportEmail.trim() : "";
@@ -190,7 +207,7 @@ app.post("/register-site", async (req, res) => {
   }
 });
 
-app.post("/index-site", async (req, res) => {
+apiRouter.post("/index-site", async (req, res) => {
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
 
   if (!siteId) {
@@ -209,7 +226,7 @@ app.post("/index-site", async (req, res) => {
   }
 });
 
-app.get("/site-index/:siteId", (req, res) => {
+apiRouter.get("/site-index/:siteId", (req, res) => {
   const siteId = typeof req.params.siteId === "string" ? req.params.siteId.trim() : "";
   const summary = getSiteIndexStatus(siteId);
 
@@ -222,7 +239,7 @@ app.get("/site-index/:siteId", (req, res) => {
   return res.json(summary);
 });
 
-app.get("/human-support-status", (_req, res) => {
+apiRouter.get("/human-support-status", (_req, res) => {
   const agentStatus = getAgentStatus();
 
   return res.json({
@@ -233,7 +250,7 @@ app.get("/human-support-status", (_req, res) => {
   });
 });
 
-app.post("/live-chat/start", (req, res) => {
+apiRouter.post("/live-chat/start", (req, res) => {
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
   const visitorName = typeof req.body.visitorName === "string" ? req.body.visitorName.trim() : "";
   const visitorEmail = typeof req.body.visitorEmail === "string" ? req.body.visitorEmail.trim() : "";
@@ -281,7 +298,7 @@ app.post("/live-chat/start", (req, res) => {
   }
 });
 
-app.get("/live-chat/:conversationId/messages", (req, res) => {
+apiRouter.get("/live-chat/:conversationId/messages", (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const since = typeof req.query.since === "string" ? req.query.since.trim() : "";
 
@@ -300,7 +317,7 @@ app.get("/live-chat/:conversationId/messages", (req, res) => {
   }
 });
 
-app.post("/live-chat/:conversationId/messages", (req, res) => {
+apiRouter.post("/live-chat/:conversationId/messages", (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
 
@@ -322,21 +339,21 @@ app.post("/live-chat/:conversationId/messages", (req, res) => {
   }
 });
 
-app.get("/agent/live-chat/conversations", requireAgentAuth, (_req, res) => {
+apiRouter.get("/agent/live-chat/conversations", requireAgentAuth, (_req, res) => {
   return res.json({
     available: getAgentStatus().available,
     conversations: listConversations()
   });
 });
 
-app.post("/agent/live-chat/availability", requireAgentAuth, (req, res) => {
+apiRouter.post("/agent/live-chat/availability", requireAgentAuth, (req, res) => {
   const available = Boolean(req.body.available);
   const status = setAgentStatus(available);
 
   return res.json(status);
 });
 
-app.get("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
+apiRouter.get("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
 
   try {
@@ -352,7 +369,7 @@ app.get("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res
   }
 });
 
-app.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
+apiRouter.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
 
@@ -373,7 +390,7 @@ app.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (req, re
   }
 });
 
-app.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req, res) => {
+apiRouter.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
 
   try {
@@ -389,7 +406,7 @@ app.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req, res) 
   }
 });
 
-app.post("/human-handoff", async (req, res) => {
+apiRouter.post("/human-handoff", async (req, res) => {
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
@@ -457,7 +474,7 @@ app.post("/human-handoff", async (req, res) => {
   }
 });
 
-app.post("/chat", async (req, res) => {
+apiRouter.post("/chat", async (req, res) => {
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
 
@@ -544,6 +561,14 @@ app.post("/chat", async (req, res) => {
     });
   }
 });
+
+const basePath = getBasePath();
+
+if (basePath) {
+  app.use(basePath, apiRouter);
+}
+
+app.use(apiRouter);
 
 app.listen(port, () => {
   console.log(`Webaction AI Chat backend listening on port ${port}`);
