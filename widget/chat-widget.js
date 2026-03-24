@@ -44,6 +44,11 @@
       ".wa-chat-settings{display:none;margin:0 16px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 12px 30px rgba(15,23,42,.08)}" +
       ".wa-chat-settings.wa-chat-settings-open{display:block}" +
       ".wa-chat-settings-item{width:100%;border:none;background:#fff;color:#0f172a;padding:12px 14px;text-align:left;display:flex;justify-content:space-between;align-items:center;font-size:14px}" +
+      ".wa-chat-settings-label{display:flex;align-items:center;gap:10px}" +
+      ".wa-chat-settings-icon{width:18px;text-align:center;color:#94a3b8;font-size:16px}" +
+      ".wa-chat-settings-state{display:flex;align-items:center;gap:8px;color:#475569}" +
+      ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-label-text{color:#94a3b8;text-decoration:line-through}" +
+      ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-state{color:#94a3b8}" +
       ".wa-chat-settings-item + .wa-chat-settings-item{border-top:1px solid #e2e8f0}" +
       ".wa-chat-settings-meta{margin:0 16px 14px;color:#475569;font-size:13px}" +
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{width:60px;height:60px}}";
@@ -140,10 +145,10 @@
 
     var settingsPanel = document.createElement("div");
     settingsPanel.className = "wa-chat-settings";
-    settingsPanel.innerHTML =
-      '<button type="button" class="wa-chat-settings-item" id="wa-chat-change-name"><span>Changer le nom d\'usager</span><span>✎</span></button>' +
-      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-popup"><span>Message pop-up</span><span id="wa-chat-popup-status">Désactivé</span></button>' +
-      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-sound"><span>Son</span><span id="wa-chat-sound-status">Activé</span></button>';
+      settingsPanel.innerHTML =
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-change-name"><span class="wa-chat-settings-label"><span class="wa-chat-settings-label-text">Changer le nom d\'usager</span></span><span class="wa-chat-settings-state"><span class="wa-chat-settings-icon">✎</span></span></button>' +
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-popup"><span class="wa-chat-settings-label"><span class="wa-chat-settings-label-text">Message pop-up</span></span><span class="wa-chat-settings-state"><span id="wa-chat-popup-status">Désactivé</span><span class="wa-chat-settings-icon" id="wa-chat-popup-icon">🗔</span></span></button>' +
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-sound"><span class="wa-chat-settings-label"><span class="wa-chat-settings-label-text">Son</span></span><span class="wa-chat-settings-state"><span id="wa-chat-sound-status">Activé</span><span class="wa-chat-settings-icon" id="wa-chat-sound-icon">🔊</span></span></button>';
 
     var handoffPanel = document.createElement("div");
     handoffPanel.className = "wa-chat-handoff-panel wa-chat-hidden";
@@ -253,8 +258,14 @@
       settingsMeta.textContent = preferences.visitorName
         ? "Nom enregistré : " + preferences.visitorName
         : "Nom enregistré : Aucun";
+      var popupButton = document.getElementById("wa-chat-toggle-popup");
+      var soundButton = document.getElementById("wa-chat-toggle-sound");
       document.getElementById("wa-chat-popup-status").textContent = preferences.popupEnabled ? "Activé" : "Désactivé";
       document.getElementById("wa-chat-sound-status").textContent = preferences.soundEnabled ? "Activé" : "Désactivé";
+      document.getElementById("wa-chat-popup-icon").textContent = preferences.popupEnabled ? "🗔" : "🗕";
+      document.getElementById("wa-chat-sound-icon").textContent = preferences.soundEnabled ? "🔊" : "🔇";
+      popupButton.classList.toggle("wa-chat-settings-item-disabled", !preferences.popupEnabled);
+      soundButton.classList.toggle("wa-chat-settings-item-disabled", !preferences.soundEnabled);
       supportName.value = preferences.visitorName;
     }
 
