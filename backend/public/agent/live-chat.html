@@ -175,6 +175,18 @@
         container.scrollTop = container.scrollHeight;
       }
 
+      function formatConversationStatus(status) {
+        if (status === "open") {
+          return "ouverte";
+        }
+
+        if (status === "closed") {
+          return "fermée";
+        }
+
+        return status || "";
+      }
+
       function renderConversationList(conversations) {
         var list = document.getElementById("conversationList");
         list.innerHTML = "";
@@ -191,7 +203,7 @@
             item.innerHTML =
               "<strong>" + (conversation.siteName || conversation.siteId) + "</strong><br>" +
               (conversation.visitorEmail || "Aucun courriel") + "<br>" +
-              "Statut : " + conversation.status;
+              "Statut : " + formatConversationStatus(conversation.status);
             item.addEventListener("click", function () {
               loadConversation(conversation.id);
             });
