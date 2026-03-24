@@ -169,6 +169,23 @@ function closeConversation(conversationId) {
   return conversation;
 }
 
+function deleteConversation(conversationId) {
+  const conversations = listConversations();
+  const conversationIndex = conversations.findIndex((item) => item.id === conversationId);
+
+  if (conversationIndex === -1) {
+    const error = new Error(`Unknown conversationId: ${conversationId}`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const deletedConversation = conversations[conversationIndex];
+  conversations.splice(conversationIndex, 1);
+  saveConversations(conversations);
+
+  return deletedConversation;
+}
+
 function getConversationMessages(conversationId, since) {
   const conversation = findConversationById(conversationId);
 
@@ -193,6 +210,7 @@ module.exports = {
   addMessageToConversation,
   closeConversation,
   createConversation,
+  deleteConversation,
   findConversationById,
   getAgentStatus,
   getConversationMessages,

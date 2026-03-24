@@ -22,6 +22,7 @@ const {
   addMessageToConversation,
   closeConversation,
   createConversation,
+  deleteConversation,
   findConversationById,
   getAgentStatus,
   getConversationMessages,
@@ -404,6 +405,22 @@ apiRouter.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req,
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       error: error.message || "Failed to close conversation"
+    });
+  }
+});
+
+apiRouter.delete("/agent/live-chat/:conversationId", requireAgentAuth, (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+
+  try {
+    const conversation = deleteConversation(conversationId);
+    return res.json({
+      ok: true,
+      conversation
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to delete conversation"
     });
   }
 });

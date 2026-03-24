@@ -203,6 +203,7 @@
       <div class="composer" style="margin-top: 8px;">
         <button id="sendReply">Envoyer</button>
         <button class="secondary" id="closeConversation">Fermer la conversation</button>
+        <button class="secondary" id="deleteConversation">Supprimer</button>
       </div>
     </main>
   </div>
@@ -441,6 +442,27 @@
 
         api("/agent/live-chat/" + activeConversationId + "/close", {
           method: "POST"
+        }).then(function () {
+          activeConversationId = null;
+          activeConversation = null;
+          document.getElementById("conversationTitle").textContent = "Sélectionnez une conversation";
+          document.getElementById("messages").innerHTML = "";
+          refreshConversations();
+        });
+      });
+
+      document.getElementById("deleteConversation").addEventListener("click", function () {
+        if (!activeConversationId) {
+          return;
+        }
+
+        var confirmed = window.confirm("Voulez-vous vraiment supprimer ce clavardage ? Cette action est irréversible.");
+        if (!confirmed) {
+          return;
+        }
+
+        api("/agent/live-chat/" + activeConversationId, {
+          method: "DELETE"
         }).then(function () {
           activeConversationId = null;
           activeConversation = null;
