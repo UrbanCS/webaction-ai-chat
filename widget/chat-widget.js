@@ -18,8 +18,11 @@
       ".wa-chat-toggle{width:64px;height:64px;border:none;border-radius:999px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;font-size:28px;font-weight:700;cursor:pointer;box-shadow:0 18px 40px rgba(15,118,110,.32)}" +
       ".wa-chat-window{position:absolute;right:0;bottom:80px;width:360px;height:500px;display:flex;flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.2);overflow:hidden}" +
       ".wa-chat-hidden{display:none}" +
-      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;gap:10px}" +
+      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;justify-content:space-between;gap:10px}" +
+      ".wa-chat-header-title{display:flex;align-items:center;gap:10px}" +
       ".wa-chat-header-badge{width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.16);display:inline-flex;align-items:center;justify-content:center;font-size:15px}" +
+      ".wa-chat-header-actions{display:flex;align-items:center;gap:8px}" +
+      ".wa-chat-icon-button{width:34px;height:34px;border:none;border-radius:10px;background:rgba(255,255,255,.16);color:#fff;font-size:16px;cursor:pointer}" +
       ".wa-chat-messages{flex:1;padding:16px;overflow-y:auto;background:linear-gradient(180deg,#f8fafc 0%,#eef6f5 100%)}" +
       ".wa-chat-message{margin-bottom:14px;display:flex}" +
       ".wa-chat-message-user{justify-content:flex-end}" +
@@ -38,6 +41,11 @@
       ".wa-chat-support-form{display:flex;flex-direction:column;gap:8px}" +
       ".wa-chat-support-actions{display:flex;gap:8px}" +
       ".wa-chat-support-secondary{background:#e5e7eb;color:#0f172a}" +
+      ".wa-chat-settings{display:none;margin:0 16px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 12px 30px rgba(15,23,42,.08)}" +
+      ".wa-chat-settings.wa-chat-settings-open{display:block}" +
+      ".wa-chat-settings-item{width:100%;border:none;background:#fff;color:#0f172a;padding:12px 14px;text-align:left;display:flex;justify-content:space-between;align-items:center;font-size:14px}" +
+      ".wa-chat-settings-item + .wa-chat-settings-item{border-top:1px solid #e2e8f0}" +
+      ".wa-chat-settings-meta{margin:0 16px 14px;color:#475569;font-size:13px}" +
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{width:60px;height:60px}}";
     document.head.appendChild(style);
     stylesInjected = true;
@@ -68,6 +76,24 @@
     return message.text;
   }
 
+  function playNotificationSound() {
+    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return;
+    }
+
+    var audioContext = new AudioContextClass();
+    var oscillator = audioContext.createOscillator();
+    var gainNode = audioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.12);
+  }
+
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
 
@@ -95,13 +121,29 @@
     var windowEl = document.createElement("div");
     windowEl.className = "wa-chat-window wa-chat-hidden";
 
+    var preferencesKey = "webactionVisitorPreferences";
+    var preferences = loadPreferences();
+
     var header = document.createElement("div");
     header.className = "wa-chat-header";
-    header.innerHTML = '<span class="wa-chat-header-badge">✦</span><span>' + config.title + "</span>";
+    header.innerHTML =
+      '<div class="wa-chat-header-title"><span class="wa-chat-header-badge">✦</span><span>' +
+      config.title +
+      '</span></div><div class="wa-chat-header-actions"><button type="button" class="wa-chat-icon-button" id="wa-chat-settings-toggle" aria-label="Préférences">⚙</button></div>';
 
     var messages = document.createElement("div");
     messages.className = "wa-chat-messages";
     messages.appendChild(createMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin."));
+
+    var settingsMeta = document.createElement("div");
+    settingsMeta.className = "wa-chat-settings-meta";
+
+    var settingsPanel = document.createElement("div");
+    settingsPanel.className = "wa-chat-settings";
+    settingsPanel.innerHTML =
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-change-name"><span>Changer le nom d\'usager</span><span>✎</span></button>' +
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-popup"><span>Message pop-up</span><span id="wa-chat-popup-status">Désactivé</span></button>' +
+      '<button type="button" class="wa-chat-settings-item" id="wa-chat-toggle-sound"><span>Son</span><span id="wa-chat-sound-status">Activé</span></button>';
 
     var handoffPanel = document.createElement("div");
     handoffPanel.className = "wa-chat-handoff-panel wa-chat-hidden";
@@ -160,6 +202,7 @@
     var livePollTimer = null;
     var lastLiveMessageAt = "";
     var seenLiveMessageIds = {};
+    var hasLivePollingStarted = false;
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -176,6 +219,8 @@
 
     windowEl.appendChild(header);
     windowEl.appendChild(messages);
+    windowEl.appendChild(settingsMeta);
+    windowEl.appendChild(settingsPanel);
     windowEl.appendChild(handoffPanel);
     windowEl.appendChild(form);
 
@@ -183,9 +228,58 @@
     root.appendChild(toggle);
     document.body.appendChild(root);
 
-    function appendMessage(role, text) {
+    function loadPreferences() {
+      try {
+        var stored = JSON.parse(window.localStorage.getItem(preferencesKey) || "{}");
+        return {
+          visitorName: stored.visitorName || "",
+          popupEnabled: stored.popupEnabled === true,
+          soundEnabled: stored.soundEnabled !== false
+        };
+      } catch (_error) {
+        return {
+          visitorName: "",
+          popupEnabled: false,
+          soundEnabled: true
+        };
+      }
+    }
+
+    function savePreferences() {
+      window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
+    }
+
+    function renderPreferences() {
+      settingsMeta.textContent = preferences.visitorName
+        ? "Nom enregistré : " + preferences.visitorName
+        : "Nom enregistré : Aucun";
+      document.getElementById("wa-chat-popup-status").textContent = preferences.popupEnabled ? "Activé" : "Désactivé";
+      document.getElementById("wa-chat-sound-status").textContent = preferences.soundEnabled ? "Activé" : "Désactivé";
+      supportName.value = preferences.visitorName;
+    }
+
+    function notifyIncomingMessage(text) {
+      if (preferences.soundEnabled) {
+        playNotificationSound();
+      }
+
+      if (!preferences.popupEnabled || !("Notification" in window)) {
+        return;
+      }
+
+      if (Notification.permission === "granted") {
+        new Notification(config.title, { body: text });
+      }
+    }
+
+    function appendMessage(role, text, options) {
+      var settings = options || {};
       messages.appendChild(createMessage(role, text));
       messages.scrollTop = messages.scrollHeight;
+
+      if (settings.notify) {
+        notifyIncomingMessage(text);
+      }
     }
 
     function appendLiveMessage(message, options) {
@@ -201,7 +295,9 @@
         return;
       }
 
-      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, getLiveMessageText(message));
+      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, getLiveMessageText(message), {
+        notify: hasLivePollingStarted && message.senderType !== "visitor"
+      });
     }
 
     function stopLivePolling() {
@@ -258,12 +354,14 @@
       activeConversationId = conversationId;
       lastLiveMessageAt = "";
       seenLiveMessageIds = {};
+      hasLivePollingStarted = false;
 
       (initialMessages || []).forEach(function (message) {
         appendLiveMessage(message);
       });
 
       stopLivePolling();
+      hasLivePollingStarted = true;
       livePollTimer = window.setInterval(pollLiveMessages, 3000);
     }
 
@@ -282,6 +380,49 @@
       if (!windowEl.classList.contains("wa-chat-hidden")) {
         input.focus();
       }
+    });
+
+    document.getElementById("wa-chat-settings-toggle").addEventListener("click", function () {
+      settingsPanel.classList.toggle("wa-chat-settings-open");
+    });
+
+    document.getElementById("wa-chat-change-name").addEventListener("click", function () {
+      var nextName = window.prompt("Entrez le nom à afficher :", preferences.visitorName || "");
+      if (nextName === null) {
+        return;
+      }
+
+      preferences.visitorName = nextName.trim();
+      savePreferences();
+      renderPreferences();
+    });
+
+    document.getElementById("wa-chat-toggle-sound").addEventListener("click", function () {
+      preferences.soundEnabled = !preferences.soundEnabled;
+      savePreferences();
+      renderPreferences();
+    });
+
+    document.getElementById("wa-chat-toggle-popup").addEventListener("click", function () {
+      if (!("Notification" in window)) {
+        window.alert("Les notifications navigateur ne sont pas supportées ici.");
+        return;
+      }
+
+      if (!preferences.popupEnabled && Notification.permission !== "granted") {
+        Notification.requestPermission().then(function (permission) {
+          if (permission === "granted") {
+            preferences.popupEnabled = true;
+            savePreferences();
+            renderPreferences();
+          }
+        });
+        return;
+      }
+
+      preferences.popupEnabled = !preferences.popupEnabled;
+      savePreferences();
+      renderPreferences();
     });
 
     supportCancel.addEventListener("click", function () {
@@ -308,6 +449,10 @@
         message: supportMessage.value.trim() || lastUserMessage,
         pageUrl: window.location.href
       };
+
+      preferences.visitorName = payload.name;
+      savePreferences();
+      renderPreferences();
 
       if (currentHandoff.agentAvailable && currentHandoff.liveStartEndpoint) {
         fetch(config.apiUrl.replace(/\/$/, "") + currentHandoff.liveStartEndpoint, {
@@ -455,7 +600,7 @@
           });
         })
         .then(function (data) {
-          appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.");
+          appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.", { notify: true });
           if (data.handoffSuggested && data.humanHandoff) {
             showSupportPanel(data.humanHandoff);
           }
@@ -474,6 +619,8 @@
           input.focus();
         });
     });
+
+    renderPreferences();
   }
 
   window.WebactionChat = {
