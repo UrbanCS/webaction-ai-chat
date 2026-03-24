@@ -74,7 +74,7 @@
     var toggle = document.createElement("button");
     toggle.className = "wa-chat-toggle";
     toggle.type = "button";
-    toggle.setAttribute("aria-label", "Open chat");
+    toggle.setAttribute("aria-label", "Ouvrir le chat");
     toggle.textContent = "C";
 
     var windowEl = document.createElement("div");
@@ -86,7 +86,7 @@
 
     var messages = document.createElement("div");
     messages.className = "wa-chat-messages";
-    messages.appendChild(createMessage("ai", "Hello. How can I help you today?"));
+    messages.appendChild(createMessage("ai", "Bonjour. Comment puis-je vous aider aujourd'hui ?"));
 
     var handoffPanel = document.createElement("div");
     handoffPanel.className = "wa-chat-handoff-panel wa-chat-hidden";
@@ -101,17 +101,17 @@
     var supportName = document.createElement("input");
     supportName.className = "wa-chat-support-input";
     supportName.type = "text";
-    supportName.placeholder = "Your name (optional)";
+    supportName.placeholder = "Votre nom (optionnel)";
 
     var supportEmail = document.createElement("input");
     supportEmail.className = "wa-chat-support-input";
     supportEmail.type = "email";
-    supportEmail.placeholder = "Your email";
+    supportEmail.placeholder = "Votre courriel";
 
     var supportMessage = document.createElement("textarea");
     supportMessage.className = "wa-chat-support-textarea";
     supportMessage.rows = 3;
-    supportMessage.placeholder = "What do you need help with?";
+    supportMessage.placeholder = "Expliquez votre demande";
 
     var supportActions = document.createElement("div");
     supportActions.className = "wa-chat-support-actions";
@@ -119,12 +119,12 @@
     var supportSubmit = document.createElement("button");
     supportSubmit.className = "wa-chat-support-submit";
     supportSubmit.type = "submit";
-    supportSubmit.textContent = "Send request";
+    supportSubmit.textContent = "Envoyer la demande";
 
     var supportCancel = document.createElement("button");
     supportCancel.className = "wa-chat-support-submit wa-chat-support-secondary";
     supportCancel.type = "button";
-    supportCancel.textContent = "Cancel";
+    supportCancel.textContent = "Annuler";
 
     supportActions.appendChild(supportSubmit);
     supportActions.appendChild(supportCancel);
@@ -149,12 +149,12 @@
     var input = document.createElement("input");
     input.className = "wa-chat-input";
     input.type = "text";
-    input.placeholder = "Type your message...";
+    input.placeholder = "Écrivez votre message...";
 
     var send = document.createElement("button");
     send.className = "wa-chat-send";
     send.type = "submit";
-    send.textContent = "Send";
+    send.textContent = "Envoyer";
 
     form.appendChild(input);
     form.appendChild(send);
@@ -217,7 +217,7 @@
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Could not refresh live chat.");
+              throw new Error(data.error || "Impossible d'actualiser le chat en direct.");
             }
 
             return data;
@@ -229,7 +229,7 @@
           });
 
           if (data.status === "closed") {
-            appendMessage("system", "This live conversation has been closed.");
+            appendMessage("system", "Cette conversation en direct a été fermée.");
             activeConversationId = null;
             stopLivePolling();
           }
@@ -256,9 +256,9 @@
       currentHandoff = handoff;
       supportMessage.value = lastUserMessage;
       handoffCopy.textContent = handoff.agentAvailable
-        ? "A person appears to be available. Start a live conversation now."
-        : "No agent appears to be available right now. Send your request and the team can contact you later.";
-      supportSubmit.textContent = handoff.agentAvailable ? "Start live chat" : "Send request";
+        ? "Une personne semble disponible. Démarrez une conversation en direct maintenant."
+        : "Aucun agent ne semble disponible pour le moment. Envoyez votre demande et l'équipe pourra vous répondre plus tard.";
+      supportSubmit.textContent = handoff.agentAvailable ? "Démarrer le chat en direct" : "Envoyer la demande";
       handoffPanel.classList.remove("wa-chat-hidden");
     }
 
@@ -282,7 +282,7 @@
 
       var email = supportEmail.value.trim();
       if (!email) {
-        appendMessage("ai", "Please enter your email so the team can follow up.");
+        appendMessage("ai", "Veuillez entrer votre courriel afin que l'équipe puisse faire un suivi.");
         return;
       }
 
@@ -311,21 +311,21 @@
           .then(function (response) {
             return response.json().then(function (data) {
               if (!response.ok) {
-                throw new Error(data.error || "Could not start live chat.");
+                throw new Error(data.error || "Impossible de démarrer le chat en direct.");
               }
 
               return data;
             });
           })
           .then(function (data) {
-            appendMessage("system", "Live chat started. A person can now answer here.");
+            appendMessage("system", "Le chat en direct a démarré. Une personne peut maintenant répondre ici.");
             hideSupportPanel();
             startLivePolling(data.conversationId, data.messages || []);
           })
           .catch(function (error) {
             appendMessage(
               "ai",
-              error && error.message ? error.message : "Could not start live chat."
+              error && error.message ? error.message : "Impossible de démarrer le chat en direct."
             );
           });
 
@@ -356,13 +356,13 @@
           });
         })
         .then(function (data) {
-          appendMessage("ai", data.reply || "A human follow-up request has been sent.");
+          appendMessage("ai", data.reply || "Une demande de suivi humain a été envoyée.");
           hideSupportPanel();
         })
         .catch(function (error) {
           appendMessage(
             "ai",
-            error && error.message ? error.message : "Could not request human follow-up."
+            error && error.message ? error.message : "Impossible d'envoyer la demande de suivi humain."
           );
         });
     });
@@ -391,7 +391,7 @@
           .then(function (response) {
             return response.json().then(function (data) {
               if (!response.ok) {
-                throw new Error(data.error || "Could not send live chat message.");
+                throw new Error(data.error || "Impossible d'envoyer le message du chat en direct.");
               }
 
               return data;
@@ -406,7 +406,7 @@
           .catch(function (error) {
             appendMessage(
               "system",
-              error && error.message ? error.message : "Could not send live chat message."
+              error && error.message ? error.message : "Impossible d'envoyer le message du chat en direct."
             );
           });
 
@@ -433,7 +433,7 @@
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Request failed with status " + response.status);
+              throw new Error(data.error || "La requête a échoué avec le statut " + response.status);
             }
 
             return data;

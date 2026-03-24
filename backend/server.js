@@ -111,8 +111,8 @@ function getHumanFallbackPayload(site) {
     agentLabel: humanAgentLabel,
     contactEmail: humanFallbackEmail || null,
     message: agentStatus.available
-      ? "A person appears to be available. You can ask for human help now."
-      : "If you want, I can send your request to a human team member for follow-up.",
+      ? "Une personne semble disponible. Vous pouvez demander de l'aide humaine maintenant."
+      : "Si vous le souhaitez, je peux envoyer votre demande à un membre de l'équipe pour un suivi.",
     endpoint: "/human-handoff",
     liveStartEndpoint: "/live-chat/start",
     statusEndpoint: "/human-support-status",
@@ -282,7 +282,7 @@ apiRouter.post("/live-chat/start", (req, res) => {
 
     addMessageToConversation(conversation.id, {
       senderType: "system",
-      text: `${humanAgentLabel} joined the request queue. An agent can reply here shortly.`
+      text: `${humanAgentLabel} a rejoint la file d'attente. Un agent peut répondre ici sous peu.`
     });
 
     return res.json({
@@ -464,8 +464,8 @@ apiRouter.post("/human-handoff", async (req, res) => {
       ok: true,
       requestId: request.id,
       reply: request.mode === "live"
-        ? "Your request to speak with a person has been sent. A team member can follow up using the email you provided."
-        : "Your request has been sent for human follow-up. Someone from the team can contact you using the email you provided."
+        ? "Votre demande pour parler à une personne a bien été envoyée. Un membre de l'équipe pourra vous répondre à l'adresse fournie."
+        : "Votre demande de suivi humain a bien été envoyée. Quelqu'un de l'équipe pourra vous contacter à l'adresse fournie."
     });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
@@ -503,7 +503,7 @@ apiRouter.post("/chat", async (req, res) => {
     if (retrievalResult.site.chunkCount === 0) {
       return res.json({
         reply:
-          "I could not find enough website content for this site yet. Please run indexing or check the site crawl target.",
+          "Je n'ai pas encore trouvé assez de contenu pour ce site. Veuillez lancer l'indexation ou vérifier la cible du crawl.",
         sources: [],
         handoffSuggested: true,
         humanHandoff: getHumanFallbackPayload(site)

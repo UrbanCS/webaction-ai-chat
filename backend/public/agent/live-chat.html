@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Webaction Agent Chat</title>
+  <title>Chat Agent Webaction</title>
   <style>
     body {
       margin: 0;
@@ -115,28 +115,28 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="header">
-        <h2>Agent Chat</h2>
-        <button id="toggleAvailability">Go Online</button>
+        <h2>Chat Agent</h2>
+        <button id="toggleAvailability">Passer en ligne</button>
       </div>
-      <div class="status" id="availabilityStatus">Loading agent status...</div>
+      <div class="status" id="availabilityStatus">Chargement du statut agent...</div>
       <div class="conversation-list" id="conversationList"></div>
     </aside>
     <main class="main">
-      <h2 id="conversationTitle">Select a conversation</h2>
+      <h2 id="conversationTitle">Sélectionnez une conversation</h2>
       <div class="messages" id="messages"></div>
       <div class="composer">
-        <textarea id="replyText" placeholder="Write a reply..."></textarea>
+        <textarea id="replyText" placeholder="Écrivez une réponse..."></textarea>
       </div>
       <div class="composer" style="margin-top: 8px;">
-        <button id="sendReply">Send</button>
-        <button class="secondary" id="closeConversation">Close conversation</button>
+        <button id="sendReply">Envoyer</button>
+        <button class="secondary" id="closeConversation">Fermer la conversation</button>
       </div>
     </main>
   </div>
 
   <script>
     (function () {
-      var agentKey = window.prompt("Enter the agent dashboard key:");
+      var agentKey = window.prompt("Entrez la clé du tableau de bord agent :");
       var activeConversationId = null;
       var activeConversation = null;
       var basePath = window.location.pathname.replace(/\/agent\/live-chat\.html$/, "");
@@ -151,7 +151,7 @@
         return fetch(basePath + path, requestOptions).then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Request failed.");
+              throw new Error(data.error || "La requête a échoué.");
             }
 
             return data;
@@ -188,8 +188,8 @@
             item.className = "conversation-item" + (conversation.id === activeConversationId ? " active" : "");
             item.innerHTML =
               "<strong>" + (conversation.siteName || conversation.siteId) + "</strong><br>" +
-              (conversation.visitorEmail || "No email") + "<br>" +
-              "Status: " + conversation.status;
+              (conversation.visitorEmail || "Aucun courriel") + "<br>" +
+              "Statut : " + conversation.status;
             item.addEventListener("click", function () {
               loadConversation(conversation.id);
             });
@@ -200,11 +200,11 @@
       function refreshConversations() {
         return api("/agent/live-chat/conversations").then(function (data) {
           document.getElementById("availabilityStatus").textContent = data.available
-            ? "Agent status: Online"
-            : "Agent status: Offline";
+            ? "Statut agent : En ligne"
+            : "Statut agent : Hors ligne";
           document.getElementById("toggleAvailability").textContent = data.available
-            ? "Go Offline"
-            : "Go Online";
+            ? "Passer hors ligne"
+            : "Passer en ligne";
           renderConversationList(data.conversations || []);
         });
       }
@@ -216,7 +216,7 @@
           activeConversation = data.conversation;
           document.getElementById("conversationTitle").textContent =
             (activeConversation.siteName || activeConversation.siteId) + " - " +
-            (activeConversation.visitorEmail || "No email");
+            (activeConversation.visitorEmail || "Aucun courriel");
           renderMessages(activeConversation.messages || []);
           refreshConversations();
         });
@@ -255,7 +255,7 @@
         }).then(function () {
           activeConversationId = null;
           activeConversation = null;
-          document.getElementById("conversationTitle").textContent = "Select a conversation";
+          document.getElementById("conversationTitle").textContent = "Sélectionnez une conversation";
           document.getElementById("messages").innerHTML = "";
           refreshConversations();
         });
