@@ -74,7 +74,7 @@
     var toggle = document.createElement("button");
     toggle.className = "wa-chat-toggle";
     toggle.type = "button";
-    toggle.setAttribute("aria-label", "Ouvrir le chat");
+    toggle.setAttribute("aria-label", "Ouvrir le clavardage");
     toggle.textContent = "C";
 
     var windowEl = document.createElement("div");
@@ -217,7 +217,7 @@
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Impossible d'actualiser le chat en direct.");
+              throw new Error(data.error || "Impossible d'actualiser le clavardage en direct.");
             }
 
             return data;
@@ -229,7 +229,7 @@
           });
 
           if (data.status === "closed") {
-            appendMessage("system", "Cette conversation en direct a été fermée.");
+            appendMessage("system", "Cette conversation de clavardage en direct a été fermée.");
             activeConversationId = null;
             stopLivePolling();
           }
@@ -258,7 +258,7 @@
       handoffCopy.textContent = handoff.agentAvailable
         ? "Une personne semble disponible. Démarrez une conversation en direct maintenant."
         : "Aucun agent ne semble disponible pour le moment. Envoyez votre demande et l'équipe pourra vous répondre plus tard.";
-      supportSubmit.textContent = handoff.agentAvailable ? "Démarrer le chat en direct" : "Envoyer la demande";
+      supportSubmit.textContent = handoff.agentAvailable ? "Démarrer le clavardage en direct" : "Envoyer la demande";
       handoffPanel.classList.remove("wa-chat-hidden");
     }
 
@@ -311,21 +311,21 @@
           .then(function (response) {
             return response.json().then(function (data) {
               if (!response.ok) {
-                throw new Error(data.error || "Impossible de démarrer le chat en direct.");
+                throw new Error(data.error || "Impossible de démarrer le clavardage en direct.");
               }
 
               return data;
             });
           })
           .then(function (data) {
-            appendMessage("system", "Le chat en direct a démarré. Une personne peut maintenant répondre ici.");
+            appendMessage("system", "Le clavardage en direct a démarré. Une personne peut maintenant répondre ici.");
             hideSupportPanel();
             startLivePolling(data.conversationId, data.messages || []);
           })
           .catch(function (error) {
             appendMessage(
               "ai",
-              error && error.message ? error.message : "Impossible de démarrer le chat en direct."
+              error && error.message ? error.message : "Impossible de démarrer le clavardage en direct."
             );
           });
 
@@ -391,7 +391,7 @@
           .then(function (response) {
             return response.json().then(function (data) {
               if (!response.ok) {
-                throw new Error(data.error || "Impossible d'envoyer le message du chat en direct.");
+                throw new Error(data.error || "Impossible d'envoyer le message du clavardage en direct.");
               }
 
               return data;
@@ -406,7 +406,7 @@
           .catch(function (error) {
             appendMessage(
               "system",
-              error && error.message ? error.message : "Impossible d'envoyer le message du chat en direct."
+              error && error.message ? error.message : "Impossible d'envoyer le message du clavardage en direct."
             );
           });
 
