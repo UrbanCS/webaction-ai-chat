@@ -2,7 +2,7 @@
   var defaultConfig = {
     apiUrl: "http://localhost:3000",
     siteId: "",
-    title: "Assistant"
+    title: "Clavardage"
   };
 
   var stylesInjected = false;
@@ -15,10 +15,11 @@
     var style = document.createElement("style");
     style.textContent =
       ".wa-chat-root{position:fixed;right:20px;bottom:20px;z-index:999999;font-family:Arial,sans-serif;color:#1f2937}" +
-      ".wa-chat-toggle{width:64px;height:64px;border:none;border-radius:999px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;font-size:24px;font-weight:700;cursor:pointer;box-shadow:0 18px 40px rgba(15,118,110,.32)}" +
+      ".wa-chat-toggle{width:64px;height:64px;border:none;border-radius:999px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;font-size:28px;font-weight:700;cursor:pointer;box-shadow:0 18px 40px rgba(15,118,110,.32)}" +
       ".wa-chat-window{position:absolute;right:0;bottom:80px;width:360px;height:500px;display:flex;flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.2);overflow:hidden}" +
       ".wa-chat-hidden{display:none}" +
-      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em}" +
+      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;gap:10px}" +
+      ".wa-chat-header-badge{width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.16);display:inline-flex;align-items:center;justify-content:center;font-size:15px}" +
       ".wa-chat-messages{flex:1;padding:16px;overflow-y:auto;background:linear-gradient(180deg,#f8fafc 0%,#eef6f5 100%)}" +
       ".wa-chat-message{margin-bottom:14px;display:flex}" +
       ".wa-chat-message-user{justify-content:flex-end}" +
@@ -77,18 +78,18 @@
     toggle.className = "wa-chat-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-label", "Ouvrir le clavardage");
-    toggle.textContent = "C";
+    toggle.textContent = "✦";
 
     var windowEl = document.createElement("div");
     windowEl.className = "wa-chat-window wa-chat-hidden";
 
     var header = document.createElement("div");
     header.className = "wa-chat-header";
-    header.textContent = config.title;
+    header.innerHTML = '<span class="wa-chat-header-badge">✦</span><span>' + config.title + "</span>";
 
     var messages = document.createElement("div");
     messages.className = "wa-chat-messages";
-    messages.appendChild(createMessage("ai", "Bonjour. Comment puis-je vous aider aujourd'hui ?"));
+    messages.appendChild(createMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin."));
 
     var handoffPanel = document.createElement("div");
     handoffPanel.className = "wa-chat-handoff-panel wa-chat-hidden";
