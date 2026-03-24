@@ -349,7 +349,7 @@
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Human handoff request failed.");
+              throw new Error(data.error || "La demande de transfert humain a échoué.");
             }
 
             return data;
@@ -440,7 +440,7 @@
           });
         })
         .then(function (data) {
-          appendMessage("ai", data.reply || "No reply returned.");
+          appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.");
           if (data.handoffSuggested && data.humanHandoff) {
             showSupportPanel(data.humanHandoff);
           }
@@ -450,7 +450,7 @@
             "ai",
             error && error.message
               ? error.message
-              : "Sorry, something went wrong. Please try again."
+              : "Désolé, une erreur est survenue. Veuillez réessayer."
           );
         })
         .finally(function () {

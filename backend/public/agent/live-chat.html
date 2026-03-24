@@ -223,7 +223,7 @@
       }
 
       document.getElementById("toggleAvailability").addEventListener("click", function () {
-        var currentlyOnline = document.getElementById("availabilityStatus").textContent.indexOf("Online") !== -1;
+        var currentlyOnline = document.getElementById("availabilityStatus").textContent.indexOf("En ligne") !== -1;
         api("/agent/live-chat/availability", {
           method: "POST",
           body: JSON.stringify({ available: !currentlyOnline })
