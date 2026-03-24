@@ -29,6 +29,20 @@
       align-items: center;
       margin-bottom: 16px;
     }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .icon-button {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: #e2e8f0;
+      color: #0f172a;
+      font-size: 18px;
+      line-height: 1;
+    }
     .conversation-list {
       display: flex;
       flex-direction: column;
@@ -102,6 +116,45 @@
       margin-bottom: 16px;
       font-size: 14px;
     }
+    .settings-menu {
+      display: none;
+      margin-bottom: 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .settings-menu.open {
+      display: block;
+    }
+    .settings-option {
+      width: 100%;
+      border: none;
+      background: #ffffff;
+      color: #0f172a;
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .settings-option + .settings-option {
+      border-top: 1px solid #e2e8f0;
+    }
+    .settings-meta {
+      color: #475569;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .message-label {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
     @media (max-width: 900px) {
       .layout {
         grid-template-columns: 1fr;
@@ -118,8 +171,26 @@
     <aside class="sidebar">
       <div class="header">
         <h2>Clavardage Agent</h2>
-        <button id="toggleAvailability">Passer en ligne</button>
+        <div class="header-actions">
+          <button class="icon-button" id="settingsToggle" title="Préférences">⚙</button>
+          <button id="toggleAvailability">Passer en ligne</button>
+        </div>
       </div>
+      <div class="settings-menu" id="settingsMenu">
+        <button class="settings-option" id="changeAgentName">
+          <span>Changer le nom d'usager</span>
+          <span>✎</span>
+        </button>
+        <button class="settings-option" id="togglePopup">
+          <span>Message pop-up</span>
+          <span id="popupStatus">Désactivé</span>
+        </button>
+        <button class="settings-option" id="toggleSound">
+          <span>Son</span>
+          <span id="soundStatus">Activé</span>
+        </button>
+      </div>
+      <div class="settings-meta" id="agentNameMeta">Nom affiché : Agent Webaction</div>
       <div class="status" id="availabilityStatus">Chargement du statut agent...</div>
       <div class="conversation-list" id="conversationList"></div>
     </aside>
@@ -142,6 +213,91 @@
       var activeConversationId = null;
       var activeConversation = null;
       var basePath = window.location.pathname.replace(/\/agent\/live-chat\.html$/, "");
+      var preferencesKey = "webactionAgentPreferences";
+      var hasInitializedNotifications = false;
+      var notifiedMessageIds = {};
+      var preferences = loadPreferences();
+
+      function loadPreferences() {
+        try {
+          var stored = JSON.parse(window.localStorage.getItem(preferencesKey) || "{}");
+          return {
+            agentName: stored.agentName || "Agent Webaction",
+            soundEnabled: stored.soundEnabled !== false,
+            popupEnabled: stored.popupEnabled === true
+          };
+        } catch (_error) {
+          return {
+            agentName: "Agent Webaction",
+            soundEnabled: true,
+            popupEnabled: false
+          };
+        }
+      }
+
+      function savePreferences() {
+        window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
+      }
+
+      function renderPreferences() {
+        document.getElementById("agentNameMeta").textContent = "Nom affiché : " + preferences.agentName;
+        document.getElementById("soundStatus").textContent = preferences.soundEnabled ? "Activé" : "Désactivé";
+        document.getElementById("popupStatus").textContent = preferences.popupEnabled ? "Activé" : "Désactivé";
+      }
+
+      function playNotificationSound() {
+        if (!preferences.soundEnabled) {
+          return;
+        }
+
+        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        var oscillator = audioContext.createOscillator();
+        var gainNode = audioContext.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.12);
+      }
+
+      function showBrowserNotification(title, body) {
+        if (!preferences.popupEnabled || !("Notification" in window)) {
+          return;
+        }
+
+        if (Notification.permission === "granted") {
+          new Notification(title, { body: body });
+        }
+      }
+
+      function maybeNotifyForConversation(conversation) {
+        if (!conversation || !conversation.messages || !conversation.messages.length) {
+          return;
+        }
+
+        var latestMessage = conversation.messages[conversation.messages.length - 1];
+        if (!latestMessage || latestMessage.senderType !== "visitor" || !latestMessage.id) {
+          return;
+        }
+
+        if (!hasInitializedNotifications) {
+          notifiedMessageIds[latestMessage.id] = true;
+          return;
+        }
+
+        if (notifiedMessageIds[latestMessage.id]) {
+          return;
+        }
+
+        notifiedMessageIds[latestMessage.id] = true;
+        playNotificationSound();
+        showBrowserNotification(
+          conversation.siteName || "Nouveau message",
+          (conversation.visitorEmail || "Visiteur") + " : " + latestMessage.text
+        );
+      }
 
       function api(path, options) {
         var requestOptions = options || {};
@@ -168,7 +324,21 @@
         messages.forEach(function (message) {
           var el = document.createElement("div");
           el.className = "message " + message.senderType;
-          el.textContent = message.text;
+
+          var label = document.createElement("div");
+          label.className = "message-label";
+          if (message.senderType === "agent") {
+            label.textContent = message.senderName || preferences.agentName;
+          } else if (message.senderType === "visitor") {
+            label.textContent = "Visiteur";
+          } else {
+            label.textContent = "Système";
+          }
+
+          var content = document.createElement("div");
+          content.textContent = message.text;
+          el.appendChild(label);
+          el.appendChild(content);
           container.appendChild(el);
         });
 
@@ -219,6 +389,8 @@
           document.getElementById("toggleAvailability").textContent = data.available
             ? "Passer hors ligne"
             : "Passer en ligne";
+          (data.conversations || []).forEach(maybeNotifyForConversation);
+          hasInitializedNotifications = true;
           renderConversationList(data.conversations || []);
         });
       }
@@ -252,7 +424,10 @@
 
         api("/agent/live-chat/" + activeConversationId + "/messages", {
           method: "POST",
-          body: JSON.stringify({ text: text })
+          body: JSON.stringify({
+            text: text,
+            senderName: preferences.agentName
+          })
         }).then(function () {
           document.getElementById("replyText").value = "";
           loadConversation(activeConversationId);
@@ -275,6 +450,50 @@
         });
       });
 
+      document.getElementById("settingsToggle").addEventListener("click", function () {
+        document.getElementById("settingsMenu").classList.toggle("open");
+      });
+
+      document.getElementById("changeAgentName").addEventListener("click", function () {
+        var nextName = window.prompt("Entrez le nom affiché pour l'agent :", preferences.agentName);
+        if (!nextName || !nextName.trim()) {
+          return;
+        }
+
+        preferences.agentName = nextName.trim();
+        savePreferences();
+        renderPreferences();
+      });
+
+      document.getElementById("toggleSound").addEventListener("click", function () {
+        preferences.soundEnabled = !preferences.soundEnabled;
+        savePreferences();
+        renderPreferences();
+      });
+
+      document.getElementById("togglePopup").addEventListener("click", function () {
+        if (!("Notification" in window)) {
+          window.alert("Les notifications navigateur ne sont pas supportées ici.");
+          return;
+        }
+
+        if (!preferences.popupEnabled && Notification.permission !== "granted") {
+          Notification.requestPermission().then(function (permission) {
+            if (permission === "granted") {
+              preferences.popupEnabled = true;
+              savePreferences();
+              renderPreferences();
+            }
+          });
+          return;
+        }
+
+        preferences.popupEnabled = !preferences.popupEnabled;
+        savePreferences();
+        renderPreferences();
+      });
+
+      renderPreferences();
       refreshConversations();
       setInterval(function () {
         refreshConversations();

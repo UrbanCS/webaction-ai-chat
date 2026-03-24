@@ -56,6 +56,18 @@
     return message;
   }
 
+  function getLiveMessageText(message) {
+    if (!message) {
+      return "";
+    }
+
+    if (message.senderType === "agent" && message.senderName) {
+      return message.senderName + " : " + message.text;
+    }
+
+    return message.text;
+  }
+
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
 
@@ -189,7 +201,7 @@
         return;
       }
 
-      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, message.text);
+      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, getLiveMessageText(message));
     }
 
     function stopLivePolling() {

@@ -109,7 +109,7 @@ function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEma
   return conversation;
 }
 
-function addMessageToConversation(conversationId, { senderType, text }) {
+function addMessageToConversation(conversationId, { senderType, text, senderName }) {
   if (!text || !text.trim()) {
     const error = new Error("text is required");
     error.statusCode = 400;
@@ -137,6 +137,10 @@ function addMessageToConversation(conversationId, { senderType, text }) {
     text: text.trim(),
     createdAt: new Date().toISOString()
   };
+
+  if (senderName && typeof senderName === "string" && senderName.trim()) {
+    message.senderName = senderName.trim();
+  }
 
   conversation.messages.push(message);
   conversation.updatedAt = new Date().toISOString();
