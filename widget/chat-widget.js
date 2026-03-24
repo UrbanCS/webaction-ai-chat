@@ -545,7 +545,8 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            text: message
+            text: message,
+            senderName: preferences.visitorName
           })
         })
           .then(function (response) {

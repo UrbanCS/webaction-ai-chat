@@ -331,7 +331,7 @@
           if (message.senderType === "agent") {
             label.textContent = message.senderName || preferences.agentName;
           } else if (message.senderType === "visitor") {
-            label.textContent = "Visiteur";
+            label.textContent = message.senderName || activeConversation.visitorName || "Visiteur";
           } else {
             label.textContent = "Système";
           }

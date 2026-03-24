@@ -321,11 +321,13 @@ apiRouter.get("/live-chat/:conversationId/messages", (req, res) => {
 apiRouter.post("/live-chat/:conversationId/messages", (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+  const senderName = typeof req.body.senderName === "string" ? req.body.senderName.trim() : "";
 
   try {
     const result = addMessageToConversation(conversationId, {
       senderType: "visitor",
-      text
+      text,
+      senderName
     });
 
     return res.json({
