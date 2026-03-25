@@ -2,7 +2,7 @@
   var defaultConfig = {
     apiUrl: "http://localhost:3000",
     siteId: "",
-    title: "Clavardage IA"
+    title: "Assistant IA"
   };
 
   var stylesInjected = false;
