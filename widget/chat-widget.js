@@ -98,6 +98,16 @@
     oscillator.stop(audioContext.currentTime + 0.12);
   }
 
+  function isDirectHumanRequest(message) {
+    if (!message) {
+      return false;
+    }
+
+    return /(parler|joindre|contacter|discuter|echanger|échanger).*(agent|humain|personne|support)|agent humain|support humain|parler a un agent|parler à un agent/i.test(
+      message
+    );
+  }
+
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
 
@@ -378,6 +388,46 @@
       handoffPanel.classList.remove("wa-chat-hidden");
     }
 
+    function openHumanSupportFlow() {
+      fetch(config.apiUrl.replace(/\/$/, "") + "/human-support-status")
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "Impossible de vérifier la disponibilité de l'équipe.");
+            }
+
+            return data;
+          });
+        })
+        .then(function (data) {
+          appendMessage(
+            "system",
+            data.available
+              ? "Je peux vous mettre en relation avec une personne maintenant."
+              : "Aucun agent ne semble disponible pour le moment. Vous pouvez laisser une demande de suivi."
+          );
+
+          showSupportPanel({
+            agentAvailable: Boolean(data.available),
+            liveStartEndpoint: "/live-chat/start",
+            endpoint: "/human-handoff"
+          });
+        })
+        .catch(function (error) {
+          appendMessage(
+            "ai",
+            error && error.message
+              ? error.message
+              : "Impossible d'ouvrir le formulaire de soutien humain pour le moment."
+          );
+        })
+        .finally(function () {
+          input.disabled = false;
+          send.disabled = false;
+          input.focus();
+        });
+    }
+
     toggle.addEventListener("click", function () {
       windowEl.classList.toggle("wa-chat-hidden");
       if (!windowEl.classList.contains("wa-chat-hidden")) {
@@ -583,6 +633,11 @@
       input.value = "";
       input.disabled = true;
       send.disabled = true;
+
+      if (isDirectHumanRequest(message)) {
+        openHumanSupportFlow();
+        return;
+      }
 
       fetch(config.apiUrl.replace(/\/$/, "") + "/chat", {
         method: "POST",
