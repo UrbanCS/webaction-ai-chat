@@ -2,7 +2,7 @@
   var defaultConfig = {
     apiUrl: "http://localhost:3000",
     siteId: "",
-    title: "Clavardage"
+    title: "Clavardage IA"
   };
 
   var stylesInjected = false;
@@ -119,7 +119,7 @@
     var toggle = document.createElement("button");
     toggle.className = "wa-chat-toggle";
     toggle.type = "button";
-    toggle.setAttribute("aria-label", "Ouvrir le clavardage");
+    toggle.setAttribute("aria-label", "Ouvrir le clavardage IA");
     toggle.textContent = "✦";
 
     var windowEl = document.createElement("div");
