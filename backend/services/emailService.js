@@ -25,6 +25,13 @@ function getTransporter() {
     auth: {
       user: getRequiredEnv("SMTP_USER"),
       pass: getRequiredEnv("SMTP_PASS")
+    },
+    tls: {
+      rejectUnauthorized:
+        String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || "true").toLowerCase() !== "false",
+      ...(process.env.SMTP_TLS_SERVERNAME
+        ? { servername: process.env.SMTP_TLS_SERVERNAME }
+        : {})
     }
   });
 
