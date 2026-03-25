@@ -50,7 +50,6 @@
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-label-text{color:#94a3b8;text-decoration:line-through}" +
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-state{color:#94a3b8}" +
       ".wa-chat-settings-item + .wa-chat-settings-item{border-top:1px solid #e2e8f0}" +
-      ".wa-chat-settings-meta{margin:0 16px 14px;color:#475569;font-size:13px}" +
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{width:60px;height:60px}}";
     document.head.appendChild(style);
     stylesInjected = true;
@@ -140,9 +139,6 @@
     messages.className = "wa-chat-messages";
     messages.appendChild(createMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin."));
 
-    var settingsMeta = document.createElement("div");
-    settingsMeta.className = "wa-chat-settings-meta";
-
     var settingsPanel = document.createElement("div");
     settingsPanel.className = "wa-chat-settings";
       settingsPanel.innerHTML =
@@ -224,7 +220,6 @@
 
     windowEl.appendChild(header);
     windowEl.appendChild(messages);
-    windowEl.appendChild(settingsMeta);
     windowEl.appendChild(settingsPanel);
     windowEl.appendChild(handoffPanel);
     windowEl.appendChild(form);
@@ -255,9 +250,6 @@
     }
 
     function renderPreferences() {
-      settingsMeta.textContent = preferences.visitorName
-        ? "Nom enregistré : " + preferences.visitorName
-        : "Nom enregistré : Aucun";
       var popupButton = document.getElementById("wa-chat-toggle-popup");
       var soundButton = document.getElementById("wa-chat-toggle-sound");
       document.getElementById("wa-chat-popup-status").textContent = preferences.popupEnabled ? "Activé" : "Désactivé";
