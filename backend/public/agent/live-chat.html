@@ -141,6 +141,33 @@
       align-items: center;
       font-size: 14px;
     }
+    .settings-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .settings-label-text {
+      color: #0f172a;
+    }
+    .settings-state {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #475569;
+    }
+    .settings-icon {
+      width: 18px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 16px;
+    }
+    .settings-option.settings-option-disabled .settings-label-text {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    .settings-option.settings-option-disabled .settings-state {
+      color: #94a3b8;
+    }
     .settings-option + .settings-option {
       border-top: 1px solid #e2e8f0;
     }
@@ -178,16 +205,12 @@
       </div>
       <div class="settings-menu" id="settingsMenu">
         <button class="settings-option" id="changeAgentName">
-          <span>Changer le nom d'usager</span>
-          <span>✎</span>
-        </button>
-        <button class="settings-option" id="togglePopup">
-          <span>Message pop-up</span>
-          <span id="popupStatus">Désactivé</span>
+          <span class="settings-label"><span class="settings-label-text">Changer le nom d'usager</span></span>
+          <span class="settings-state"><span class="settings-icon">✎</span></span>
         </button>
         <button class="settings-option" id="toggleSound">
-          <span>Son</span>
-          <span id="soundStatus">Activé</span>
+          <span class="settings-label"><span class="settings-label-text">Son</span></span>
+          <span class="settings-state"><span id="soundStatus">Activé</span><span class="settings-icon" id="soundIcon">🔊</span></span>
         </button>
       </div>
       <div class="settings-meta" id="agentNameMeta">Nom affiché : Agent Webaction</div>
@@ -224,14 +247,12 @@
           var stored = JSON.parse(window.localStorage.getItem(preferencesKey) || "{}");
           return {
             agentName: stored.agentName || "Agent Webaction",
-            soundEnabled: stored.soundEnabled !== false,
-            popupEnabled: stored.popupEnabled === true
+            soundEnabled: stored.soundEnabled !== false
           };
         } catch (_error) {
           return {
             agentName: "Agent Webaction",
-            soundEnabled: true,
-            popupEnabled: false
+            soundEnabled: true
           };
         }
       }
@@ -242,8 +263,10 @@
 
       function renderPreferences() {
         document.getElementById("agentNameMeta").textContent = "Nom affiché : " + preferences.agentName;
+        var soundButton = document.getElementById("toggleSound");
         document.getElementById("soundStatus").textContent = preferences.soundEnabled ? "Activé" : "Désactivé";
-        document.getElementById("popupStatus").textContent = preferences.popupEnabled ? "Activé" : "Désactivé";
+        document.getElementById("soundIcon").textContent = preferences.soundEnabled ? "🔊" : "🔇";
+        soundButton.classList.toggle("settings-option-disabled", !preferences.soundEnabled);
       }
 
       function playNotificationSound() {
@@ -261,16 +284,6 @@
         gainNode.connect(audioContext.destination);
         oscillator.start();
         oscillator.stop(audioContext.currentTime + 0.12);
-      }
-
-      function showBrowserNotification(title, body) {
-        if (!preferences.popupEnabled || !("Notification" in window)) {
-          return;
-        }
-
-        if (Notification.permission === "granted") {
-          new Notification(title, { body: body });
-        }
       }
 
       function maybeNotifyForConversation(conversation) {
@@ -294,10 +307,6 @@
 
         notifiedMessageIds[latestMessage.id] = true;
         playNotificationSound();
-        showBrowserNotification(
-          conversation.siteName || "Nouveau message",
-          (conversation.visitorEmail || "Visiteur") + " : " + latestMessage.text
-        );
       }
 
       function api(path, options) {
@@ -489,28 +498,6 @@
 
       document.getElementById("toggleSound").addEventListener("click", function () {
         preferences.soundEnabled = !preferences.soundEnabled;
-        savePreferences();
-        renderPreferences();
-      });
-
-      document.getElementById("togglePopup").addEventListener("click", function () {
-        if (!("Notification" in window)) {
-          window.alert("Les notifications navigateur ne sont pas supportées ici.");
-          return;
-        }
-
-        if (!preferences.popupEnabled && Notification.permission !== "granted") {
-          Notification.requestPermission().then(function (permission) {
-            if (permission === "granted") {
-              preferences.popupEnabled = true;
-              savePreferences();
-              renderPreferences();
-            }
-          });
-          return;
-        }
-
-        preferences.popupEnabled = !preferences.popupEnabled;
         savePreferences();
         renderPreferences();
       });
