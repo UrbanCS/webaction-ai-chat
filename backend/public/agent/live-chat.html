@@ -487,8 +487,9 @@
             item.type = "button";
             item.className = "conversation-item" + (conversation.id === activeConversationId ? " active" : "");
             item.innerHTML =
-              "<strong>" + (conversation.siteName || conversation.siteId) + "</strong><br>" +
+              "<strong>" + (conversation.visitorName || "Visiteur") + "</strong><br>" +
               (conversation.visitorEmail || "Aucun courriel") + "<br>" +
+              (conversation.siteName || conversation.siteId) + "<br>" +
               "Statut : " + formatConversationStatus(conversation.status);
             item.addEventListener("click", function () {
               loadConversation(conversation.id);
