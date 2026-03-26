@@ -165,6 +165,7 @@
     windowEl.className = "wa-chat-window wa-chat-hidden";
 
     var preferencesKey = "webactionVisitorPreferences";
+    var chatStateKey = "webactionChatState:" + config.siteId;
     var preferences = loadPreferences();
 
     var header = document.createElement("div");
@@ -179,7 +180,6 @@
 
     var messages = document.createElement("div");
     messages.className = "wa-chat-messages";
-    messages.appendChild(createMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin."));
 
     var settingsPanel = document.createElement("div");
     settingsPanel.className = "wa-chat-settings";
@@ -250,6 +250,7 @@
     var agentTypingEl = null;
     var visitorTypingTimer = null;
     var lastVisitorTypingState = false;
+    var displayedMessages = [];
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -274,12 +275,59 @@
     root.appendChild(toggle);
     document.body.appendChild(root);
 
+    function loadChatState() {
+      try {
+        var stored = JSON.parse(window.localStorage.getItem(chatStateKey) || "{}");
+        return {
+          isOpen: stored.isOpen === true,
+          activeConversationId: stored.activeConversationId || null,
+          lastLiveMessageAt: stored.lastLiveMessageAt || "",
+          seenLiveMessageIds: stored.seenLiveMessageIds || {},
+          lastUserMessage: stored.lastUserMessage || "",
+          currentHandoff: stored.currentHandoff || null,
+          messages: Array.isArray(stored.messages) ? stored.messages : []
+        };
+      } catch (_error) {
+        return {
+          isOpen: false,
+          activeConversationId: null,
+          lastLiveMessageAt: "",
+          seenLiveMessageIds: {},
+          lastUserMessage: "",
+          currentHandoff: null,
+          messages: []
+        };
+      }
+    }
+
+    function saveChatState() {
+      window.localStorage.setItem(chatStateKey, JSON.stringify({
+        isOpen: !windowEl.classList.contains("wa-chat-hidden"),
+        activeConversationId: activeConversationId,
+        lastLiveMessageAt: lastLiveMessageAt,
+        seenLiveMessageIds: seenLiveMessageIds,
+        lastUserMessage: lastUserMessage,
+        currentHandoff: currentHandoff,
+        messages: displayedMessages
+      }));
+    }
+
+    function renderStoredMessages() {
+      messages.innerHTML = "";
+      displayedMessages.forEach(function (item) {
+        messages.appendChild(createMessage(item.role, item.text));
+      });
+      messages.scrollTop = messages.scrollHeight;
+    }
+
     function toggleWindow(forceOpen) {
       if (typeof forceOpen === "boolean") {
         windowEl.classList.toggle("wa-chat-hidden", !forceOpen);
       } else {
         windowEl.classList.toggle("wa-chat-hidden");
       }
+
+      saveChatState();
 
       if (!windowEl.classList.contains("wa-chat-hidden")) {
         input.focus();
@@ -335,8 +383,13 @@
 
     function appendMessage(role, text, options) {
       var settings = options || {};
+      displayedMessages.push({
+        role: role,
+        text: text
+      });
       messages.appendChild(createMessage(role, text));
       messages.scrollTop = messages.scrollHeight;
+      saveChatState();
 
       if (settings.notify) {
         notifyIncomingMessage(text);
@@ -373,6 +426,8 @@
       } else {
         aiTypingEl = null;
       }
+
+      saveChatState();
     }
 
     function appendLiveMessage(message, options) {
@@ -402,6 +457,8 @@
         window.clearInterval(livePollTimer);
         livePollTimer = null;
       }
+
+      saveChatState();
     }
 
     function hideSupportPanel() {
@@ -409,6 +466,7 @@
       handoffPanel.classList.add("wa-chat-hidden");
       handoffCopy.textContent = "";
       supportMessage.value = "";
+      saveChatState();
     }
 
     function pollLiveMessages() {
@@ -446,6 +504,7 @@
             appendMessage("system", "Cette conversation de clavardage en direct a été fermée.");
             activeConversationId = null;
             stopLivePolling();
+            saveChatState();
           }
         })
         .catch(function () {
@@ -487,6 +546,7 @@
       stopLivePolling();
       hasLivePollingStarted = true;
       livePollTimer = window.setInterval(pollLiveMessages, 3000);
+      saveChatState();
     }
 
     function showSupportPanel(handoff) {
@@ -497,6 +557,7 @@
         : "Aucun agent ne semble disponible pour le moment. Envoyez votre demande et l'équipe pourra vous répondre plus tard.";
       supportSubmit.textContent = handoff.agentAvailable ? "Démarrer le clavardage en direct" : "Envoyer la demande";
       handoffPanel.classList.remove("wa-chat-hidden");
+      saveChatState();
     }
 
     function openHumanSupportFlow() {
@@ -729,6 +790,7 @@
             if (data.message && data.message.id) {
               seenLiveMessageIds[data.message.id] = true;
               lastLiveMessageAt = data.message.createdAt || lastLiveMessageAt;
+              saveChatState();
             }
           })
           .catch(function (error) {
@@ -830,6 +892,33 @@
         }, 2500);
       }
     });
+
+    var restoredState = loadChatState();
+    displayedMessages = restoredState.messages.slice();
+    lastUserMessage = restoredState.lastUserMessage || "";
+    currentHandoff = restoredState.currentHandoff || null;
+    activeConversationId = restoredState.activeConversationId || null;
+    lastLiveMessageAt = restoredState.lastLiveMessageAt || "";
+    seenLiveMessageIds = restoredState.seenLiveMessageIds || {};
+
+    if (displayedMessages.length === 0) {
+      appendMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin.");
+    } else {
+      renderStoredMessages();
+      if (currentHandoff) {
+        showSupportPanel(currentHandoff);
+      }
+    }
+
+    if (restoredState.isOpen) {
+      toggleWindow(true);
+    }
+
+    if (activeConversationId) {
+      hasLivePollingStarted = true;
+      livePollTimer = window.setInterval(pollLiveMessages, 3000);
+      pollLiveMessages();
+    }
 
     renderPreferences();
   }
