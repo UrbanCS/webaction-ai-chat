@@ -238,6 +238,8 @@
     var hasLivePollingStarted = false;
     var aiTypingEl = null;
     var agentTypingEl = null;
+    var visitorTypingTimer = null;
+    var lastVisitorTypingState = false;
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -441,11 +443,32 @@
         });
     }
 
+    function updateVisitorTypingState(isTyping) {
+      if (!activeConversationId || lastVisitorTypingState === Boolean(isTyping)) {
+        return;
+      }
+
+      lastVisitorTypingState = Boolean(isTyping);
+
+      fetch(config.apiUrl.replace(/\/$/, "") + "/live-chat/" + activeConversationId + "/typing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          isTyping: lastVisitorTypingState
+        })
+      }).catch(function () {
+        return null;
+      });
+    }
+
     function startLivePolling(conversationId, initialMessages) {
       activeConversationId = conversationId;
       lastLiveMessageAt = "";
       seenLiveMessageIds = {};
       hasLivePollingStarted = false;
+      lastVisitorTypingState = false;
 
       (initialMessages || []).forEach(function (message) {
         appendLiveMessage(message);
@@ -670,6 +693,7 @@
 
       if (activeConversationId) {
         appendMessage("user", message);
+        updateVisitorTypingState(false);
         input.value = "";
 
         fetch(config.apiUrl.replace(/\/$/, "") + "/live-chat/" + activeConversationId + "/messages", {
@@ -761,6 +785,25 @@
           send.disabled = false;
           input.focus();
         });
+    });
+
+    input.addEventListener("input", function (event) {
+      if (!activeConversationId) {
+        return;
+      }
+
+      var hasText = Boolean(event.target.value.trim());
+      updateVisitorTypingState(hasText);
+
+      if (visitorTypingTimer) {
+        window.clearTimeout(visitorTypingTimer);
+      }
+
+      if (hasText) {
+        visitorTypingTimer = window.setTimeout(function () {
+          updateVisitorTypingState(false);
+        }, 2500);
+      }
     });
 
     renderPreferences();

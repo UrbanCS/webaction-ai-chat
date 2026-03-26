@@ -392,6 +392,23 @@ apiRouter.post("/live-chat/:conversationId/messages", (req, res) => {
   }
 });
 
+apiRouter.post("/live-chat/:conversationId/typing", (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+  const isTyping = Boolean(req.body.isTyping);
+
+  try {
+    const result = setConversationTypingStatus(conversationId, "visitor", isTyping);
+    return res.json({
+      ok: true,
+      typing: result.typing
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to update visitor typing status"
+    });
+  }
+});
+
 apiRouter.get("/agent/live-chat/conversations", requireAgentAuth, (req, res) => {
   const conversations = listConversations().filter((conversation) => {
     if (req.agentAccess.type === "global" && req.agentAccess.siteId) {
