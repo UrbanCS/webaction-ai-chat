@@ -8,6 +8,17 @@ function decodeHtmlEntities(text) {
     .replace(/&gt;/gi, ">");
 }
 
+function extractTitle(html) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match ? decodeHtmlEntities(match[1]).trim() : "";
+}
+
+function extractMetaDescription(html) {
+  const match = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i)
+    || html.match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["'][^>]*>/i);
+  return match ? decodeHtmlEntities(match[1]).trim() : "";
+}
+
 function removeNoise(html) {
   return html
     .replace(/<!--[\s\S]*?-->/g, " ")
@@ -15,11 +26,18 @@ function removeNoise(html) {
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
     .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
-    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
-    .replace(/<header[\s\S]*?<\/header>/gi, " ")
     .replace(/<aside[\s\S]*?<\/aside>/gi, " ")
     .replace(/<form[\s\S]*?<\/form>/gi, " ");
+}
+
+function exposeContactLinks(html) {
+  return html
+    .replace(/<a[^>]*href=["']mailto:([^"'?#]+)[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, " Courriel: $1 ")
+    .replace(/<a[^>]*href=["']tel:([^"'?#]+)[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, " Téléphone: $1 ");
+}
+
+function exposeImageAltText(html) {
+  return html.replace(/<img[^>]+alt=["']([^"']+)["'][^>]*>/gi, " $1 ");
 }
 
 function extractTextFromHtml(html) {
@@ -27,17 +45,24 @@ function extractTextFromHtml(html) {
     return "";
   }
 
-  const cleanedHtml = removeNoise(html)
+  const title = extractTitle(html);
+  const metaDescription = extractMetaDescription(html);
+  const cleanedHtml = exposeImageAltText(exposeContactLinks(removeNoise(html)))
     .replace(/<\/(p|div|section|article|main|li|h1|h2|h3|h4|h5|h6|br)>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
 
-  return decodeHtmlEntities(cleanedHtml)
+  const bodyText = decodeHtmlEntities(cleanedHtml)
     .replace(/\r/g, " ")
     .replace(/\t/g, " ")
     .replace(/\n{2,}/g, "\n")
     .replace(/[ ]{2,}/g, " ")
     .replace(/\s+\n/g, "\n")
     .replace(/\n\s+/g, "\n")
+    .trim();
+
+  return [title ? `Titre: ${title}` : "", metaDescription ? `Description: ${metaDescription}` : "", bodyText]
+    .filter(Boolean)
+    .join("\n")
     .trim();
 }
 

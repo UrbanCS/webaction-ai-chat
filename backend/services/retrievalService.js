@@ -4,7 +4,7 @@ const { chunkPages } = require("./chunking");
 const { findSiteBySiteId } = require("./siteRegistryService");
 
 const siteIndexCache = new Map();
-const DEFAULT_TOP_CHUNKS = 4;
+const DEFAULT_TOP_CHUNKS = 6;
 const STOP_WORDS = new Set([
   "a",
   "an",
@@ -14,6 +14,16 @@ const STOP_WORDS = new Set([
   "at",
   "be",
   "by",
+  "ce",
+  "ces",
+  "cette",
+  "comment",
+  "de",
+  "des",
+  "du",
+  "en",
+  "est",
+  "et",
   "for",
   "from",
   "how",
@@ -21,12 +31,29 @@ const STOP_WORDS = new Set([
   "in",
   "is",
   "it",
+  "la",
+  "le",
+  "les",
+  "mais",
+  "ou",
   "of",
   "on",
   "or",
+  "pour",
+  "que",
+  "quel",
+  "quelle",
+  "quelles",
+  "quels",
+  "qui",
+  "sur",
   "that",
   "the",
   "to",
+  "un",
+  "une",
+  "vos",
+  "votre",
   "what",
   "when",
   "where",
@@ -38,8 +65,15 @@ const STOP_WORDS = new Set([
   "your"
 ]);
 
+function normalizeText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function tokenize(text) {
-  return (text.toLowerCase().match(/[a-z0-9]{2,}/g) || []).filter((token) => !STOP_WORDS.has(token));
+  return (normalizeText(text).match(/[a-z0-9]{2,}/g) || []).filter((token) => !STOP_WORDS.has(token));
 }
 
 function scoreChunk(chunkText, queryText) {
@@ -57,8 +91,8 @@ function scoreChunk(chunkText, queryText) {
     }
   }
 
-  const normalizedChunk = chunkText.toLowerCase();
-  const normalizedQuery = queryText.toLowerCase();
+  const normalizedChunk = normalizeText(chunkText);
+  const normalizedQuery = normalizeText(queryText);
   if (normalizedChunk.includes(normalizedQuery)) {
     score += 4;
   }

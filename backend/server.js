@@ -172,21 +172,9 @@ function shouldSuggestHumanFallback(reply, retrievalResult) {
     return true;
   }
 
-  return /not found on the website|not found on the site|could not find|couldn't find|information .* not found|pas d['’]information|n['’]y a pas d['’]information|ne sont pas disponibles sur le site|je vous recommande de contacter|adresse email fournie|contacter le support|communiquer avec un agent humain/i.test(
+  return /not found on the website|not found on the site|could not find|couldn't find|information .* not found|pas d['’]information|n['’]y a pas d['’]information|n['’]a pas ete trouvee sur le site|n['’]a pas été trouvée sur le site|ne sont pas disponibles sur le site|je vous recommande de contacter|adresse email fournie|contacter le support|communiquer avec un agent humain/i.test(
     reply || ""
   );
-}
-
-function hasReliableSiteContext(retrievalResult) {
-  if (!retrievalResult || !Array.isArray(retrievalResult.chunks) || retrievalResult.chunks.length === 0) {
-    return false;
-  }
-
-  const bestScore = retrievalResult.chunks.reduce(function (currentBest, chunk) {
-    return Math.max(currentBest, Number(chunk.score) || 0);
-  }, 0);
-
-  return bestScore >= 2;
 }
 
 function appendHumanHelpPrompt(reply) {
@@ -194,11 +182,19 @@ function appendHumanHelpPrompt(reply) {
     return reply;
   }
 
-  if (/j'aimerais parler à un agent/i.test(reply)) {
+  if (/je voudrais parler à un agent/i.test(reply)) {
     return reply;
   }
 
-  return `${reply}\n\nSi vous avez besoin de plus d'aide, tapez "J'aimerais parler à un agent".`;
+  return `${reply}\n\nSi vous avez besoin de plus d'aide, tapez "Je voudrais parler à un agent".`;
+}
+
+function isGreetingMessage(message) {
+  if (!message) {
+    return false;
+  }
+
+  return /^(bonjour|bonsoir|salut|allo|hello|hi|hey)\b[!.? ]*$/i.test(message.trim());
 }
 
 apiRouter.use("/widget", express.static(widgetDirectory));
@@ -667,6 +663,15 @@ apiRouter.post("/chat", async (req, res) => {
   }
 
   try {
+    if (isGreetingMessage(message)) {
+      return res.json({
+        reply: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
+        sources: [],
+        handoffSuggested: false,
+        humanHandoff: null
+      });
+    }
+
     const retrievalResult = await retrieveRelevantChunks(siteId, message);
     const contextBlocks = retrievalResult.chunks
       .map((chunk, index) => {
@@ -674,7 +679,7 @@ apiRouter.post("/chat", async (req, res) => {
       })
       .join("\n\n");
 
-    if (retrievalResult.site.chunkCount === 0 || !hasReliableSiteContext(retrievalResult)) {
+    if (retrievalResult.site.chunkCount === 0) {
       return res.json({
         reply:
           "Je n'ai pas trouvé de réponse fiable à cette question dans le contenu du site.",
@@ -694,6 +699,7 @@ apiRouter.post("/chat", async (req, res) => {
             "Prefer the retrieved website content over general knowledge. " +
             "Always answer in the same language as the user when possible. " +
             "Be concise and practical. " +
+            "For broad questions about what the site offers, what the company does, or what services are available, summarize the site's apparent offer based on the retrieved content even if the exact wording does not match the user's question. " +
             "If the retrieved content does not directly support the answer, say that the information was not found on the website. " +
             "Never invent services, pricing, hours, contact details, policies, or any other site details that are not supported by the retrieved content. " +
             "If relevant information is missing from the retrieved content, explicitly say it was not found on the website."

@@ -1,6 +1,6 @@
 const { URL } = require("url");
 
-const DEFAULT_MAX_PAGES = 8;
+const DEFAULT_MAX_PAGES = 20;
 const REQUEST_TIMEOUT_MS = 10000;
 const SITEMAP_CANDIDATES = ["/sitemap.xml", "/sitemap_index.xml"];
 const BLOCKED_EXTENSIONS = [
@@ -171,11 +171,22 @@ async function discoverUrls(siteUrl, maxPages) {
 async function crawlSite(siteUrl, options = {}) {
   const maxPages = options.maxPages || DEFAULT_MAX_PAGES;
   const { homepageHtml, urls } = await discoverUrls(siteUrl, maxPages);
-  const uniqueUrls = Array.from(new Set(urls)).slice(0, maxPages);
+  const normalizedSiteUrl = normalizeUrl(siteUrl, siteUrl);
+  const siteOrigin = new URL(siteUrl).origin;
+  const queue = Array.from(new Set(urls)).slice(0, maxPages);
+  const visited = new Set();
   const pages = [];
 
-  for (const url of uniqueUrls) {
-    const html = url === normalizeUrl(siteUrl, siteUrl) && homepageHtml
+  while (queue.length > 0 && pages.length < maxPages) {
+    const url = queue.shift();
+
+    if (!url || visited.has(url)) {
+      continue;
+    }
+
+    visited.add(url);
+
+    const html = url === normalizedSiteUrl && homepageHtml
       ? homepageHtml
       : await fetchText(url);
 
@@ -184,11 +195,18 @@ async function crawlSite(siteUrl, options = {}) {
     }
 
     pages.push({ url, html });
+
+    const internalLinks = extractInternalLinks(html, url, siteOrigin);
+    for (const link of internalLinks) {
+      if (!visited.has(link) && !queue.includes(link) && queue.length + pages.length < maxPages * 3) {
+        queue.push(link);
+      }
+    }
   }
 
   return {
     pages,
-    discoveredUrls: uniqueUrls
+    discoveredUrls: Array.from(visited)
   };
 }
 

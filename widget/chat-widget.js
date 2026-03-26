@@ -128,6 +128,16 @@
     );
   }
 
+  function isFallbackReply(text) {
+    if (!text) {
+      return false;
+    }
+
+    return /not found on the website|not found on the site|could not find|couldn't find|pas d['’]information|n['’]y a pas d['’]information|n['’]a pas été trouvée sur le site|n['’]a pas ete trouvee sur le site|je n['’]ai pas trouvé de réponse fiable|je n['’]ai pas trouve de reponse fiable|veuillez contacter|contactez le support|adresse email fournie|communiquer avec un agent humain/i.test(
+      text
+    );
+  }
+
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
     if (!config.siteId) {
@@ -766,8 +776,9 @@
         })
         .then(function (data) {
           hideTypingIndicator("ai");
+          var shouldOpenHumanFlow = Boolean(data.handoffSuggested) || isFallbackReply(data.reply);
 
-          if (data.handoffSuggested && data.humanHandoff) {
+          if (shouldOpenHumanFlow && data.humanHandoff) {
             appendMessage(
               "system",
               data.humanHandoff.agentAvailable
@@ -775,6 +786,11 @@
                 : "Je n'ai pas trouvé de réponse fiable sur le site. Vous pouvez envoyer une demande à une personne."
             );
             showSupportPanel(data.humanHandoff);
+            return;
+          }
+
+          if (shouldOpenHumanFlow) {
+            openHumanSupportFlow();
             return;
           }
 
