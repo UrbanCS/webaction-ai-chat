@@ -270,8 +270,11 @@
     }
 
     function buildPopoutUrl() {
-      var popoutUrl = new URL(window.location.href);
+      var popoutUrl = new URL(config.apiUrl.replace(/\/$/, "") + "/widget/popout.html");
       popoutUrl.searchParams.set("waChatPopout", "1");
+      popoutUrl.searchParams.set("apiUrl", config.apiUrl);
+      popoutUrl.searchParams.set("siteId", config.siteId);
+      popoutUrl.searchParams.set("title", config.title);
       return popoutUrl.toString();
     }
 
