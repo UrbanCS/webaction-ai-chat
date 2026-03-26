@@ -143,8 +143,8 @@
       '<div class="wa-chat-header-title"><span class="wa-chat-header-badge">✦</span><span>' +
       config.title +
       '</span></div><div class="wa-chat-header-actions">' +
-      '<button type="button" class="wa-chat-icon-button" id="wa-chat-close-toggle" aria-label="Fermer">×</button>' +
       '<button type="button" class="wa-chat-icon-button" id="wa-chat-settings-toggle" aria-label="Préférences">⚙</button>' +
+      '<button type="button" class="wa-chat-icon-button" id="wa-chat-close-toggle" aria-label="Fermer">×</button>' +
       '</div>';
 
     var messages = document.createElement("div");
