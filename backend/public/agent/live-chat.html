@@ -242,6 +242,7 @@
       var preferencesKey = "webactionAgentPreferences";
       var hasInitializedNotifications = false;
       var notifiedMessageIds = {};
+      var agentIsOnline = false;
       var preferences = loadPreferences();
 
       function loadPreferences() {
@@ -330,6 +331,37 @@
         });
       }
 
+      function sendAvailabilityBeacon(available) {
+        var url = new URL(basePath + "/agent/live-chat/availability", window.location.origin);
+        if (agentKey) {
+          url.searchParams.set("key", agentKey);
+        }
+        if (siteId) {
+          url.searchParams.set("siteId", siteId);
+        }
+
+        var payload = JSON.stringify({
+          available: available,
+          siteId: siteId || undefined
+        });
+
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url.toString(), new Blob([payload], { type: "application/json" }));
+          return;
+        }
+
+        fetch(url.toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: payload,
+          keepalive: true
+        }).catch(function () {
+          return null;
+        });
+      }
+
       function renderMessages(messages) {
         var container = document.getElementById("messages");
         container.innerHTML = "";
@@ -396,6 +428,7 @@
 
       function refreshConversations() {
         return api("/agent/live-chat/conversations").then(function (data) {
+          agentIsOnline = Boolean(data.available);
           document.getElementById("availabilityStatus").textContent = data.available
             ? "Statut agent : En ligne"
             : "Statut agent : Hors ligne";
@@ -523,6 +556,18 @@
           loadConversation(activeConversationId);
         }
       }, 4000);
+
+      window.addEventListener("pagehide", function () {
+        if (agentIsOnline) {
+          sendAvailabilityBeacon(false);
+        }
+      });
+
+      window.addEventListener("beforeunload", function () {
+        if (agentIsOnline) {
+          sendAvailabilityBeacon(false);
+        }
+      });
     })();
   </script>
 </body>
