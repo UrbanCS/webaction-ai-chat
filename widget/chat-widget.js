@@ -15,11 +15,8 @@
     var style = document.createElement("style");
     style.textContent =
       ".wa-chat-root{position:fixed;right:20px;bottom:20px;z-index:999999;font-family:Arial,sans-serif;color:#1f2937}" +
-      ".wa-chat-root.wa-chat-root-popout{inset:0;right:auto;bottom:auto}" +
       ".wa-chat-toggle{min-width:148px;height:60px;padding:0 22px;border:none;border-radius:999px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;font-size:16px;font-weight:800;letter-spacing:.01em;cursor:pointer;box-shadow:0 20px 44px rgba(15,118,110,.34);line-height:1.1}" +
       ".wa-chat-window{position:absolute;right:0;bottom:80px;width:360px;height:500px;display:flex;flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.2);overflow:hidden}" +
-      ".wa-chat-root.wa-chat-root-popout .wa-chat-toggle{display:none}" +
-      ".wa-chat-root.wa-chat-root-popout .wa-chat-window{right:0;bottom:0;inset:0;width:100%;height:100%;border:none;border-radius:0;box-shadow:none}" +
       ".wa-chat-hidden{display:none}" +
       ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;justify-content:space-between;gap:10px}" +
       ".wa-chat-header-title{display:flex;align-items:center;gap:10px}" +
@@ -53,7 +50,7 @@
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-label-text{color:#94a3b8;text-decoration:line-through}" +
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-state{color:#94a3b8}" +
       ".wa-chat-settings-item + .wa-chat-settings-item{border-top:1px solid #e2e8f0}" +
-      "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{min-width:132px;width:auto;height:54px;padding:0 18px;font-size:15px}.wa-chat-root.wa-chat-root-popout{left:0;bottom:0}}";
+      "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{min-width:132px;width:auto;height:54px;padding:0 18px;font-size:15px}}";
     document.head.appendChild(style);
     stylesInjected = true;
   }
@@ -113,9 +110,6 @@
 
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
-    var pageParams = new URLSearchParams(window.location.search);
-    var isPopoutMode = pageParams.get("waChatPopout") === "1";
-
     if (!config.siteId) {
       throw new Error("WebactionChat.init requires a siteId");
     }
@@ -130,9 +124,6 @@
     var root = document.createElement("div");
     root.id = "wa-chat-root";
     root.className = "wa-chat-root";
-    if (isPopoutMode) {
-      root.classList.add("wa-chat-root-popout");
-    }
 
     var toggle = document.createElement("button");
     toggle.className = "wa-chat-toggle";
@@ -152,7 +143,6 @@
       '<div class="wa-chat-header-title"><span class="wa-chat-header-badge">✦</span><span>' +
       config.title +
       '</span></div><div class="wa-chat-header-actions">' +
-      '<button type="button" class="wa-chat-icon-button" id="wa-chat-popout-toggle" aria-label="Ouvrir dans une nouvelle fenêtre">↗</button>' +
       '<button type="button" class="wa-chat-icon-button" id="wa-chat-close-toggle" aria-label="Fermer">×</button>' +
       '<button type="button" class="wa-chat-icon-button" id="wa-chat-settings-toggle" aria-label="Préférences">⚙</button>' +
       '</div>';
@@ -250,13 +240,6 @@
     root.appendChild(toggle);
     document.body.appendChild(root);
 
-    if (isPopoutMode) {
-      document.title = config.title;
-      toggle.style.display = "none";
-      document.getElementById("wa-chat-popout-toggle").style.display = "none";
-      windowEl.classList.remove("wa-chat-hidden");
-    }
-
     function toggleWindow(forceOpen) {
       if (typeof forceOpen === "boolean") {
         windowEl.classList.toggle("wa-chat-hidden", !forceOpen);
@@ -267,15 +250,6 @@
       if (!windowEl.classList.contains("wa-chat-hidden")) {
         input.focus();
       }
-    }
-
-    function buildPopoutUrl() {
-      var popoutUrl = new URL(config.apiUrl.replace(/\/$/, "") + "/widget/popout.html");
-      popoutUrl.searchParams.set("waChatPopout", "1");
-      popoutUrl.searchParams.set("apiUrl", config.apiUrl);
-      popoutUrl.searchParams.set("siteId", config.siteId);
-      popoutUrl.searchParams.set("title", config.title);
-      return popoutUrl.toString();
     }
 
     function loadPreferences() {
@@ -473,16 +447,7 @@
     });
 
     document.getElementById("wa-chat-close-toggle").addEventListener("click", function () {
-      if (isPopoutMode) {
-        window.close();
-        return;
-      }
-
       toggleWindow(false);
-    });
-
-    document.getElementById("wa-chat-popout-toggle").addEventListener("click", function () {
-      window.open(buildPopoutUrl(), "webaction_chat_popout", "width=430,height=760,resizable=yes,scrollbars=no");
     });
 
     document.getElementById("wa-chat-settings-toggle").addEventListener("click", function () {
