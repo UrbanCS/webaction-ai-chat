@@ -277,7 +277,7 @@
 
     function loadChatState() {
       try {
-        var stored = JSON.parse(window.localStorage.getItem(chatStateKey) || "{}");
+        var stored = JSON.parse(window.sessionStorage.getItem(chatStateKey) || "{}");
         return {
           isOpen: stored.isOpen === true,
           activeConversationId: stored.activeConversationId || null,
@@ -301,7 +301,7 @@
     }
 
     function saveChatState() {
-      window.localStorage.setItem(chatStateKey, JSON.stringify({
+      window.sessionStorage.setItem(chatStateKey, JSON.stringify({
         isOpen: !windowEl.classList.contains("wa-chat-hidden"),
         activeConversationId: activeConversationId,
         lastLiveMessageAt: lastLiveMessageAt,
