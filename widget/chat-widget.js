@@ -123,7 +123,7 @@
       return false;
     }
 
-    return /(parler|joindre|contacter|discuter|echanger|échanger).*(agent|humain|personne|support)|agent humain|support humain|parler a un agent|parler à un agent/i.test(
+    return /(parler|joindre|contacter|discuter|echanger|échanger).*(agent|humain|personne|support)|agent humain|support humain|parler a un agent|parler à un agent|agent en ligne|agent disponible|parler a une personne|parler à une personne|personne en ligne|support en ligne/i.test(
       message
     );
   }
@@ -766,10 +766,19 @@
         })
         .then(function (data) {
           hideTypingIndicator("ai");
-          appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.", { notify: true });
+
           if (data.handoffSuggested && data.humanHandoff) {
+            appendMessage(
+              "system",
+              data.humanHandoff.agentAvailable
+                ? "Je n'ai pas trouvé de réponse fiable sur le site. Je vous mets en relation avec une personne."
+                : "Je n'ai pas trouvé de réponse fiable sur le site. Vous pouvez envoyer une demande à une personne."
+            );
             showSupportPanel(data.humanHandoff);
+            return;
           }
+
+          appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.", { notify: true });
         })
         .catch(function (error) {
           hideTypingIndicator("ai");

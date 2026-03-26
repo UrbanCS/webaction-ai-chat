@@ -172,7 +172,7 @@ function shouldSuggestHumanFallback(reply, retrievalResult) {
     return true;
   }
 
-  return /not found on the website|not found on the site|could not find|couldn't find|information .* not found/i.test(
+  return /not found on the website|not found on the site|could not find|couldn't find|information .* not found|pas d['’]information|n['’]y a pas d['’]information|ne sont pas disponibles sur le site|je vous recommande de contacter|adresse email fournie|contacter le support|communiquer avec un agent humain/i.test(
     reply || ""
   );
 }
