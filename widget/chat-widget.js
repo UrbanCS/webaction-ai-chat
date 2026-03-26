@@ -403,7 +403,8 @@
     }
 
     function openHumanSupportFlow() {
-      fetch(config.apiUrl.replace(/\/$/, "") + "/human-support-status")
+      var statusUrl = config.apiUrl.replace(/\/$/, "") + "/human-support-status?siteId=" + encodeURIComponent(config.siteId);
+      fetch(statusUrl)
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok) {
