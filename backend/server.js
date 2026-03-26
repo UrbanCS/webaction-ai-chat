@@ -29,6 +29,7 @@ const {
   getSiteAgentStatus,
   getConversationMessages,
   listConversations,
+  setConversationTypingStatus,
   setAgentStatus
 } = require("./services/liveChatService");
 
@@ -357,6 +358,7 @@ apiRouter.get("/live-chat/:conversationId/messages", (req, res) => {
       conversationId,
       status: result.conversation.status,
       updatedAt: result.conversation.updatedAt,
+      agentTyping: Boolean(result.conversation.typing && result.conversation.typing.agent),
       messages: result.messages
     });
   } catch (error) {
@@ -467,6 +469,28 @@ apiRouter.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (r
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       error: error.message || "Failed to send agent message"
+    });
+  }
+});
+
+apiRouter.post("/agent/live-chat/:conversationId/typing", requireAgentAuth, (req, res) => {
+  const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
+  const isTyping = Boolean(req.body.isTyping);
+
+  try {
+    const existingConversation = findConversationById(conversationId);
+    if (!ensureConversationAccess(req, existingConversation)) {
+      return res.status(403).json({ error: "Conversation access denied" });
+    }
+
+    const result = setConversationTypingStatus(conversationId, "agent", isTyping);
+    return res.json({
+      ok: true,
+      typing: result.typing
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Failed to update typing status"
     });
   }
 });

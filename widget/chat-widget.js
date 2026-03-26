@@ -30,6 +30,10 @@
       ".wa-chat-message-user .wa-chat-bubble{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-bottom-right-radius:5px}" +
       ".wa-chat-message-ai .wa-chat-bubble,.wa-chat-message-agent .wa-chat-bubble{background:#ffffff;color:#0f172a;border:1px solid #dbe4ea;border-bottom-left-radius:5px}" +
       ".wa-chat-message-system .wa-chat-bubble{background:#fef3c7;color:#78350f;border:1px solid #fcd34d}" +
+      ".wa-chat-message-typing .wa-chat-bubble{display:flex;align-items:center;gap:5px;min-width:54px}" +
+      ".wa-chat-typing-dot{width:7px;height:7px;border-radius:999px;background:#94a3b8;display:inline-block;animation:wa-chat-typing-bounce 1s infinite ease-in-out}" +
+      ".wa-chat-typing-dot:nth-child(2){animation-delay:.15s}" +
+      ".wa-chat-typing-dot:nth-child(3){animation-delay:.3s}" +
       ".wa-chat-form{display:flex;gap:10px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
       ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}" +
@@ -50,6 +54,7 @@
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-label-text{color:#94a3b8;text-decoration:line-through}" +
       ".wa-chat-settings-item.wa-chat-settings-item-disabled .wa-chat-settings-state{color:#94a3b8}" +
       ".wa-chat-settings-item + .wa-chat-settings-item{border-top:1px solid #e2e8f0}" +
+      "@keyframes wa-chat-typing-bounce{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-3px);opacity:1}}" +
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{min-width:132px;width:auto;height:54px;padding:0 18px;font-size:15px}}";
     document.head.appendChild(style);
     stylesInjected = true;
@@ -65,6 +70,21 @@
 
     message.appendChild(bubble);
 
+    return message;
+  }
+
+  function createTypingMessage(role) {
+    var message = document.createElement("div");
+    message.className = "wa-chat-message wa-chat-message-" + role + " wa-chat-message-typing";
+
+    var bubble = document.createElement("div");
+    bubble.className = "wa-chat-bubble";
+    bubble.innerHTML =
+      '<span class="wa-chat-typing-dot"></span>' +
+      '<span class="wa-chat-typing-dot"></span>' +
+      '<span class="wa-chat-typing-dot"></span>';
+
+    message.appendChild(bubble);
     return message;
   }
 
@@ -216,6 +236,8 @@
     var lastLiveMessageAt = "";
     var seenLiveMessageIds = {};
     var hasLivePollingStarted = false;
+    var aiTypingEl = null;
+    var agentTypingEl = null;
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -309,6 +331,38 @@
       }
     }
 
+    function showTypingIndicator(role) {
+      var currentEl = role === "agent" ? agentTypingEl : aiTypingEl;
+      if (currentEl) {
+        return;
+      }
+
+      currentEl = createTypingMessage(role);
+      messages.appendChild(currentEl);
+      messages.scrollTop = messages.scrollHeight;
+
+      if (role === "agent") {
+        agentTypingEl = currentEl;
+      } else {
+        aiTypingEl = currentEl;
+      }
+    }
+
+    function hideTypingIndicator(role) {
+      var currentEl = role === "agent" ? agentTypingEl : aiTypingEl;
+      if (!currentEl) {
+        return;
+      }
+
+      currentEl.remove();
+
+      if (role === "agent") {
+        agentTypingEl = null;
+      } else {
+        aiTypingEl = null;
+      }
+    }
+
     function appendLiveMessage(message, options) {
       var settings = options || {};
       if (!message || !message.id || seenLiveMessageIds[message.id]) {
@@ -320,6 +374,10 @@
 
       if (settings.skipVisitorMessages && message.senderType === "visitor") {
         return;
+      }
+
+      if (message.senderType === "agent") {
+        hideTypingIndicator("agent");
       }
 
       appendMessage(message.senderType === "visitor" ? "user" : message.senderType, getLiveMessageText(message), {
@@ -362,6 +420,12 @@
           });
         })
         .then(function (data) {
+          if (data.agentTyping) {
+            showTypingIndicator("agent");
+          } else {
+            hideTypingIndicator("agent");
+          }
+
           (data.messages || []).forEach(function (message) {
             appendLiveMessage(message, { skipVisitorMessages: true });
           });
@@ -655,6 +719,8 @@
         return;
       }
 
+      showTypingIndicator("ai");
+
       fetch(config.apiUrl.replace(/\/$/, "") + "/chat", {
         method: "POST",
         headers: {
@@ -675,12 +741,14 @@
           });
         })
         .then(function (data) {
+          hideTypingIndicator("ai");
           appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.", { notify: true });
           if (data.handoffSuggested && data.humanHandoff) {
             showSupportPanel(data.humanHandoff);
           }
         })
         .catch(function (error) {
+          hideTypingIndicator("ai");
           appendMessage(
             "ai",
             error && error.message

@@ -126,6 +126,11 @@ function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEma
     visitorEmail: visitorEmail.trim(),
     pageUrl: pageUrl && pageUrl.trim() ? pageUrl.trim() : null,
     status: "open",
+    typing: {
+      agent: false,
+      visitor: false,
+      updatedAt: null
+    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     messages: [
@@ -177,6 +182,23 @@ function addMessageToConversation(conversationId, { senderType, text, senderName
     message.senderName = senderName.trim();
   }
 
+  if (!conversation.typing || typeof conversation.typing !== "object") {
+    conversation.typing = {
+      agent: false,
+      visitor: false,
+      updatedAt: null
+    };
+  }
+
+  if (senderType === "agent") {
+    conversation.typing.agent = false;
+  }
+
+  if (senderType === "visitor") {
+    conversation.typing.visitor = false;
+  }
+
+  conversation.typing.updatedAt = new Date().toISOString();
   conversation.messages.push(message);
   conversation.updatedAt = new Date().toISOString();
   saveConversations(conversations);
@@ -241,6 +263,41 @@ function getConversationMessages(conversationId, since) {
   };
 }
 
+function setConversationTypingStatus(conversationId, senderType, isTyping) {
+  if (!["agent", "visitor"].includes(senderType)) {
+    const error = new Error("senderType is invalid");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const conversations = listConversations();
+  const conversation = conversations.find((item) => item.id === conversationId);
+
+  if (!conversation) {
+    const error = new Error(`Unknown conversationId: ${conversationId}`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!conversation.typing || typeof conversation.typing !== "object") {
+    conversation.typing = {
+      agent: false,
+      visitor: false,
+      updatedAt: null
+    };
+  }
+
+  conversation.typing[senderType] = Boolean(isTyping);
+  conversation.typing.updatedAt = new Date().toISOString();
+  conversation.updatedAt = new Date().toISOString();
+  saveConversations(conversations);
+
+  return {
+    conversation,
+    typing: conversation.typing
+  };
+}
+
 module.exports = {
   addMessageToConversation,
   closeConversation,
@@ -251,5 +308,6 @@ module.exports = {
   getSiteAgentStatus,
   getConversationMessages,
   listConversations,
+  setConversationTypingStatus,
   setAgentStatus
 };

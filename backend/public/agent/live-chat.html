@@ -243,6 +243,8 @@
       var hasInitializedNotifications = false;
       var notifiedMessageIds = {};
       var agentIsOnline = false;
+      var typingTimer = null;
+      var lastTypingState = false;
       var preferences = loadPreferences();
 
       function loadPreferences() {
@@ -362,6 +364,21 @@
         });
       }
 
+      function updateTypingState(isTyping) {
+        if (!activeConversationId || lastTypingState === Boolean(isTyping)) {
+          return;
+        }
+
+        lastTypingState = Boolean(isTyping);
+
+        api("/agent/live-chat/" + activeConversationId + "/typing", {
+          method: "POST",
+          body: JSON.stringify({ isTyping: lastTypingState })
+        }).catch(function () {
+          return null;
+        });
+      }
+
       function renderMessages(messages) {
         var container = document.getElementById("messages");
         container.innerHTML = "";
@@ -446,6 +463,7 @@
 
       function loadConversation(conversationId) {
         activeConversationId = conversationId;
+        lastTypingState = false;
 
         api("/agent/live-chat/" + conversationId + "/messages").then(function (data) {
           activeConversation = data.conversation;
@@ -471,6 +489,8 @@
           return;
         }
 
+        updateTypingState(false);
+
         api("/agent/live-chat/" + activeConversationId + "/messages", {
           method: "POST",
           body: JSON.stringify({
@@ -490,6 +510,21 @@
         }
       });
 
+      document.getElementById("replyText").addEventListener("input", function (event) {
+        var hasText = Boolean(event.target.value.trim());
+        updateTypingState(hasText);
+
+        if (typingTimer) {
+          window.clearTimeout(typingTimer);
+        }
+
+        if (hasText) {
+          typingTimer = window.setTimeout(function () {
+            updateTypingState(false);
+          }, 2500);
+        }
+      });
+
       document.getElementById("closeConversation").addEventListener("click", function () {
         if (!activeConversationId) {
           return;
@@ -498,6 +533,7 @@
         api("/agent/live-chat/" + activeConversationId + "/close", {
           method: "POST"
         }).then(function () {
+          updateTypingState(false);
           activeConversationId = null;
           activeConversation = null;
           document.getElementById("conversationTitle").textContent = "Sélectionnez une conversation";
@@ -519,6 +555,7 @@
         api("/agent/live-chat/" + activeConversationId, {
           method: "DELETE"
         }).then(function () {
+          updateTypingState(false);
           activeConversationId = null;
           activeConversation = null;
           document.getElementById("conversationTitle").textContent = "Sélectionnez une conversation";
