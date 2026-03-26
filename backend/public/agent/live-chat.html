@@ -233,7 +233,9 @@
 
   <script>
     (function () {
-      var agentKey = window.prompt("Entrez la clé du tableau de bord agent :");
+      var params = new URLSearchParams(window.location.search);
+      var siteId = params.get("siteId") || "";
+      var agentKey = params.get("key") || window.prompt("Entrez la clé du tableau de bord agent :");
       var activeConversationId = null;
       var activeConversation = null;
       var basePath = window.location.pathname.replace(/\/agent\/live-chat\.html$/, "");
@@ -313,7 +315,8 @@
         var requestOptions = options || {};
         requestOptions.headers = Object.assign({}, requestOptions.headers || {}, {
           "Content-Type": "application/json",
-          "x-agent-key": agentKey || ""
+          "x-agent-key": agentKey || "",
+          "x-site-id": siteId || ""
         });
 
         return fetch(basePath + path, requestOptions).then(function (response) {
@@ -402,6 +405,9 @@
           (data.conversations || []).forEach(maybeNotifyForConversation);
           hasInitializedNotifications = true;
           renderConversationList(data.conversations || []);
+          if (siteId && data.conversations && data.conversations.length) {
+            document.title = "Clavardage Agent - " + (data.conversations[0].siteName || siteId);
+          }
         });
       }
 
@@ -422,7 +428,7 @@
         var currentlyOnline = document.getElementById("availabilityStatus").textContent.indexOf("En ligne") !== -1;
         api("/agent/live-chat/availability", {
           method: "POST",
-          body: JSON.stringify({ available: !currentlyOnline })
+          body: JSON.stringify({ available: !currentlyOnline, siteId: siteId || undefined })
         }).then(refreshConversations);
       });
 

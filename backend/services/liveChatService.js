@@ -38,8 +38,30 @@ function saveConversations(conversations) {
 function getAgentStatus() {
   const status = readJson(agentStatusFilePath, {
     available: defaultAgentAvailability,
-    updatedAt: null
+    updatedAt: null,
+    sites: {}
   });
+
+  if (!status.sites || typeof status.sites !== "object") {
+    status.sites = {};
+  }
+
+  return {
+    available: Boolean(status.available),
+    updatedAt: status.updatedAt || null,
+    sites: status.sites
+  };
+}
+
+function getSiteAgentStatus(siteId) {
+  const status = getAgentStatus();
+
+  if (siteId && status.sites[siteId]) {
+    return {
+      available: Boolean(status.sites[siteId].available),
+      updatedAt: status.sites[siteId].updatedAt || null
+    };
+  }
 
   return {
     available: Boolean(status.available),
@@ -47,15 +69,28 @@ function getAgentStatus() {
   };
 }
 
-function setAgentStatus(available) {
-  const status = {
-    available: Boolean(available),
-    updatedAt: new Date().toISOString()
-  };
+function setAgentStatus(available, siteId) {
+  const status = getAgentStatus();
+  const timestamp = new Date().toISOString();
+
+  if (siteId) {
+    status.sites[siteId] = {
+      available: Boolean(available),
+      updatedAt: timestamp
+    };
+  } else {
+    status.available = Boolean(available);
+    status.updatedAt = timestamp;
+  }
 
   writeJson(agentStatusFilePath, status);
 
-  return status;
+  return siteId
+    ? status.sites[siteId]
+    : {
+        available: status.available,
+        updatedAt: status.updatedAt
+      };
 }
 
 function findConversationById(conversationId) {
@@ -213,6 +248,7 @@ module.exports = {
   deleteConversation,
   findConversationById,
   getAgentStatus,
+  getSiteAgentStatus,
   getConversationMessages,
   listConversations,
   setAgentStatus

@@ -11,6 +11,7 @@ const {
 const {
   createSiteEntry,
   findSiteBySiteId,
+  isSiteDashboardAuthorized,
   listSites,
   normalizeRequiredEmail,
   normalizeOptionalEmail,
@@ -25,6 +26,7 @@ const {
   deleteConversation,
   findConversationById,
   getAgentStatus,
+  getSiteAgentStatus,
   getConversationMessages,
   listConversations,
   setAgentStatus
@@ -81,30 +83,73 @@ function buildEmbedCode(baseUrl, siteId) {
 WebactionChat.init({
   apiUrl: "${baseUrl}",
   siteId: "${siteId}",
-  title: "Assistant"
+  title: "Assistant IA"
 });
 </script>`;
 }
 
-function isAgentAuthorized(req) {
-  if (!agentDashboardKey) {
-    return true;
+function sanitizeSite(site) {
+  if (!site) {
+    return null;
   }
 
+  return {
+    siteId: site.siteId,
+    siteName: site.siteName,
+    siteUrl: site.siteUrl,
+    supportEmail: site.supportEmail,
+    createdAt: site.createdAt || null
+  };
+}
+
+function buildDashboardUrl(baseUrl, siteId, dashboardKey) {
+  return `${baseUrl}/agent/live-chat.html?siteId=${encodeURIComponent(siteId)}&key=${encodeURIComponent(dashboardKey)}`;
+}
+
+function getAgentAccessContext(req) {
   const providedKey = req.get("x-agent-key") || req.query.key || "";
-  return providedKey === agentDashboardKey;
+  const requestedSiteId = req.get("x-site-id") || req.query.siteId || (req.body && req.body.siteId) || "";
+  const siteId = typeof requestedSiteId === "string"
+    ? requestedSiteId.trim()
+    : "";
+
+  if (agentDashboardKey && providedKey === agentDashboardKey) {
+    return {
+      type: "global",
+      siteId: siteId || null
+    };
+  }
+
+  if (siteId && isSiteDashboardAuthorized(siteId, providedKey)) {
+    return {
+      type: "site",
+      siteId
+    };
+  }
+
+  return null;
 }
 
 function requireAgentAuth(req, res, next) {
-  if (!isAgentAuthorized(req)) {
+  const access = getAgentAccessContext(req);
+  if (!access) {
     return res.status(401).json({ error: "Agent authorization required" });
   }
 
+  req.agentAccess = access;
   return next();
 }
 
+function ensureConversationAccess(req, conversation) {
+  if (!req.agentAccess || req.agentAccess.type === "global") {
+    return true;
+  }
+
+  return conversation && conversation.siteId === req.agentAccess.siteId;
+}
+
 function getHumanFallbackPayload(site) {
-  const agentStatus = getAgentStatus();
+  const agentStatus = getSiteAgentStatus(site.siteId);
 
   return {
     enabled: true,
@@ -142,7 +187,7 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.get("/sites", (_req, res) => {
-  res.json(listSites());
+  res.json(listSites().map(sanitizeSite));
 });
 
 apiRouter.get("/sites/:siteId", (req, res) => {
@@ -155,7 +200,7 @@ apiRouter.get("/sites/:siteId", (req, res) => {
     });
   }
 
-  return res.json(site);
+  return res.json(sanitizeSite(site));
 });
 
 apiRouter.post("/register-site", async (req, res) => {
@@ -194,6 +239,8 @@ apiRouter.post("/register-site", async (req, res) => {
       siteName: site.siteName,
       siteUrl: site.siteUrl,
       supportEmail: site.supportEmail,
+      dashboardUrl: buildDashboardUrl(baseUrl, site.siteId, site.dashboardKey),
+      dashboardKey: site.dashboardKey,
       widgetUrl: `${baseUrl}/widget/chat-widget.js`,
       apiUrl: baseUrl,
       embedCode: buildEmbedCode(baseUrl, site.siteId),
@@ -241,7 +288,8 @@ apiRouter.get("/site-index/:siteId", (req, res) => {
 });
 
 apiRouter.get("/human-support-status", (_req, res) => {
-  const agentStatus = getAgentStatus();
+  const siteId = typeof _req.query.siteId === "string" ? _req.query.siteId.trim() : "";
+  const agentStatus = getSiteAgentStatus(siteId);
 
   return res.json({
     available: agentStatus.available,
@@ -258,7 +306,7 @@ apiRouter.post("/live-chat/start", (req, res) => {
   const initialMessage = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
   const site = findSiteBySiteId(siteId);
-  const agentStatus = getAgentStatus();
+  const agentStatus = getSiteAgentStatus(siteId);
 
   if (!site) {
     return res.status(404).json({ error: `Unknown siteId: ${siteId}` });
@@ -342,16 +390,36 @@ apiRouter.post("/live-chat/:conversationId/messages", (req, res) => {
   }
 });
 
-apiRouter.get("/agent/live-chat/conversations", requireAgentAuth, (_req, res) => {
+apiRouter.get("/agent/live-chat/conversations", requireAgentAuth, (req, res) => {
+  const conversations = listConversations().filter((conversation) => {
+    if (req.agentAccess.type === "global" && req.agentAccess.siteId) {
+      return conversation.siteId === req.agentAccess.siteId;
+    }
+
+    if (req.agentAccess.type === "site") {
+      return conversation.siteId === req.agentAccess.siteId;
+    }
+
+    return true;
+  });
+
   return res.json({
-    available: getAgentStatus().available,
-    conversations: listConversations()
+    available:
+      req.agentAccess.type === "global" && !req.agentAccess.siteId
+        ? getAgentStatus().available
+        : getSiteAgentStatus(req.agentAccess.siteId).available,
+    siteId: req.agentAccess.siteId || null,
+    conversations
   });
 });
 
 apiRouter.post("/agent/live-chat/availability", requireAgentAuth, (req, res) => {
   const available = Boolean(req.body.available);
-  const status = setAgentStatus(available);
+  const targetSiteId =
+    req.agentAccess.type === "site"
+      ? req.agentAccess.siteId
+      : (typeof req.body.siteId === "string" ? req.body.siteId.trim() : req.agentAccess.siteId);
+  const status = setAgentStatus(available, targetSiteId || null);
 
   return res.json(status);
 });
@@ -361,6 +429,9 @@ apiRouter.get("/agent/live-chat/:conversationId/messages", requireAgentAuth, (re
 
   try {
     const result = getConversationMessages(conversationId);
+    if (!ensureConversationAccess(req, result.conversation)) {
+      return res.status(403).json({ error: "Conversation access denied" });
+    }
     return res.json({
       conversationId,
       conversation: result.conversation
@@ -378,6 +449,11 @@ apiRouter.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (r
   const senderName = typeof req.body.senderName === "string" ? req.body.senderName.trim() : "";
 
   try {
+    const existingConversation = findConversationById(conversationId);
+    if (!ensureConversationAccess(req, existingConversation)) {
+      return res.status(403).json({ error: "Conversation access denied" });
+    }
+
     const result = addMessageToConversation(conversationId, {
       senderType: "agent",
       text,
@@ -399,6 +475,11 @@ apiRouter.post("/agent/live-chat/:conversationId/close", requireAgentAuth, (req,
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
 
   try {
+    const existingConversation = findConversationById(conversationId);
+    if (!ensureConversationAccess(req, existingConversation)) {
+      return res.status(403).json({ error: "Conversation access denied" });
+    }
+
     const conversation = closeConversation(conversationId);
     return res.json({
       ok: true,
@@ -415,6 +496,11 @@ apiRouter.delete("/agent/live-chat/:conversationId", requireAgentAuth, (req, res
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
 
   try {
+    const existingConversation = findConversationById(conversationId);
+    if (!ensureConversationAccess(req, existingConversation)) {
+      return res.status(403).json({ error: "Conversation access denied" });
+    }
+
     const conversation = deleteConversation(conversationId);
     return res.json({
       ok: true,

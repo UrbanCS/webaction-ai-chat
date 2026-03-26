@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const registryFilePath = path.join(__dirname, "..", "data", "sites.json");
 
@@ -83,6 +84,10 @@ function generateNextSiteId(existingSites = loadSites()) {
   return `client-${String(maxId + 1).padStart(3, "0")}`;
 }
 
+function generateDashboardKey() {
+  return `site-${crypto.randomBytes(12).toString("hex")}`;
+}
+
 function normalizeOptionalEmail(email) {
   if (typeof email !== "string" || !email.trim()) {
     return null;
@@ -126,7 +131,8 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
     const updatedSite = {
       ...existingSite,
       siteName: siteName.trim(),
-      supportEmail: normalizedSupportEmail
+      supportEmail: normalizedSupportEmail,
+      dashboardKey: existingSite.dashboardKey || generateDashboardKey()
     };
     const updatedSites = sites.map((site) => (site.siteId === updatedSite.siteId ? updatedSite : site));
     saveSites(updatedSites);
@@ -143,6 +149,7 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
     siteName: siteName.trim(),
     siteUrl: normalizedUrl,
     supportEmail: normalizedSupportEmail,
+    dashboardKey: generateDashboardKey(),
     createdAt: new Date().toISOString()
   };
 
@@ -156,11 +163,21 @@ function createSiteEntry({ siteUrl, siteName, supportEmail }) {
   };
 }
 
+function isSiteDashboardAuthorized(siteId, dashboardKey) {
+  if (!siteId || !dashboardKey) {
+    return false;
+  }
+
+  const site = findSiteBySiteId(siteId);
+  return Boolean(site && site.dashboardKey && site.dashboardKey === dashboardKey);
+}
+
 module.exports = {
   createSiteEntry,
   findSiteBySiteId,
   findSiteByUrl,
   generateNextSiteId,
+  isSiteDashboardAuthorized,
   listSites,
   loadSites,
   normalizeRequiredEmail,
