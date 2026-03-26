@@ -206,6 +206,34 @@
       margin-bottom: 4px;
       opacity: 0.8;
     }
+    .toast-stack {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      min-width: 260px;
+      max-width: 320px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #0f766e;
+      color: #ffffff;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+      cursor: pointer;
+    }
+    .toast-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .toast-copy {
+      font-size: 14px;
+      line-height: 1.35;
+    }
     @keyframes typing-bounce {
       0%, 80%, 100% {
         transform: translateY(0);
@@ -228,6 +256,7 @@
   </style>
 </head>
 <body>
+  <div class="toast-stack" id="toastStack"></div>
   <div class="layout">
     <aside class="sidebar">
       <div class="header">
@@ -276,6 +305,7 @@
       var preferencesKey = "webactionAgentPreferences";
       var hasInitializedNotifications = false;
       var notifiedMessageIds = {};
+      var knownConversationIds = {};
       var agentIsOnline = false;
       var typingTimer = null;
       var lastTypingState = false;
@@ -346,6 +376,29 @@
 
         notifiedMessageIds[latestMessage.id] = true;
         playNotificationSound();
+      }
+
+      function showToast(title, copy, onClick) {
+        var stack = document.getElementById("toastStack");
+        var toast = document.createElement("button");
+        toast.type = "button";
+        toast.className = "toast";
+        toast.innerHTML =
+          '<div class="toast-title">' + title + '</div>' +
+          '<div class="toast-copy">' + copy + '</div>';
+
+        toast.addEventListener("click", function () {
+          toast.remove();
+          if (typeof onClick === "function") {
+            onClick();
+          }
+        });
+
+        stack.appendChild(toast);
+
+        window.setTimeout(function () {
+          toast.remove();
+        }, 5000);
       }
 
       function api(path, options) {
@@ -500,6 +553,8 @@
 
       function refreshConversations() {
         return api("/agent/live-chat/conversations").then(function (data) {
+          var conversations = data.conversations || [];
+
           agentIsOnline = Boolean(data.available);
           document.getElementById("availabilityStatus").textContent = data.available
             ? "Statut agent : En ligne"
@@ -507,11 +562,29 @@
           document.getElementById("toggleAvailability").textContent = data.available
             ? "Passer hors ligne"
             : "Passer en ligne";
-          (data.conversations || []).forEach(maybeNotifyForConversation);
+
+          conversations.forEach(function (conversation) {
+            if (!knownConversationIds[conversation.id]) {
+              if (hasInitializedNotifications) {
+                showToast(
+                  "Nouveau clavardage",
+                  (conversation.visitorName || "Visiteur") + " vient d'ouvrir une conversation.",
+                  function () {
+                    loadConversation(conversation.id);
+                  }
+                );
+                playNotificationSound();
+              }
+
+              knownConversationIds[conversation.id] = true;
+            }
+          });
+
+          conversations.forEach(maybeNotifyForConversation);
           hasInitializedNotifications = true;
-          renderConversationList(data.conversations || []);
-          if (siteId && data.conversations && data.conversations.length) {
-            document.title = "Clavardage Agent - " + (data.conversations[0].siteName || siteId);
+          renderConversationList(conversations);
+          if (siteId && conversations.length) {
+            document.title = "Clavardage Agent - " + (conversations[0].siteName || siteId);
           }
         });
       }
