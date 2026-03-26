@@ -177,6 +177,30 @@ function shouldSuggestHumanFallback(reply, retrievalResult) {
   );
 }
 
+function hasReliableSiteContext(retrievalResult) {
+  if (!retrievalResult || !Array.isArray(retrievalResult.chunks) || retrievalResult.chunks.length === 0) {
+    return false;
+  }
+
+  const bestScore = retrievalResult.chunks.reduce(function (currentBest, chunk) {
+    return Math.max(currentBest, Number(chunk.score) || 0);
+  }, 0);
+
+  return bestScore >= 2;
+}
+
+function appendHumanHelpPrompt(reply) {
+  if (!reply) {
+    return reply;
+  }
+
+  if (/j'aimerais parler à un agent/i.test(reply)) {
+    return reply;
+  }
+
+  return `${reply}\n\nSi vous avez besoin de plus d'aide, tapez "J'aimerais parler à un agent".`;
+}
+
 apiRouter.use("/widget", express.static(widgetDirectory));
 apiRouter.use("/agent", express.static(agentUiDirectory));
 
@@ -650,10 +674,10 @@ apiRouter.post("/chat", async (req, res) => {
       })
       .join("\n\n");
 
-    if (retrievalResult.site.chunkCount === 0) {
+    if (retrievalResult.site.chunkCount === 0 || !hasReliableSiteContext(retrievalResult)) {
       return res.json({
         reply:
-          "Je n'ai pas encore trouvé assez de contenu pour ce site. Veuillez lancer l'indexation ou vérifier la cible du crawl.",
+          "Je n'ai pas trouvé de réponse fiable à cette question dans le contenu du site.",
         sources: [],
         handoffSuggested: true,
         humanHandoff: getHumanFallbackPayload(site)
@@ -670,6 +694,7 @@ apiRouter.post("/chat", async (req, res) => {
             "Prefer the retrieved website content over general knowledge. " +
             "Always answer in the same language as the user when possible. " +
             "Be concise and practical. " +
+            "If the retrieved content does not directly support the answer, say that the information was not found on the website. " +
             "Never invent services, pricing, hours, contact details, policies, or any other site details that are not supported by the retrieved content. " +
             "If relevant information is missing from the retrieved content, explicitly say it was not found on the website."
         },
@@ -696,9 +721,10 @@ apiRouter.post("/chat", async (req, res) => {
     }
 
     const handoffSuggested = shouldSuggestHumanFallback(reply, retrievalResult);
+    const finalReply = handoffSuggested ? appendHumanHelpPrompt(reply) : reply;
 
     return res.json({
-      reply,
+      reply: finalReply,
       sources: retrievalResult.chunks.map((chunk) => chunk.url),
       handoffSuggested,
       humanHandoff: handoffSuggested ? getHumanFallbackPayload(site) : null
