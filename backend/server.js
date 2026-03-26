@@ -582,7 +582,7 @@ apiRouter.post("/human-handoff", async (req, res) => {
       `URL de la page / Page URL: ${request.pageUrl || "Non fournie / Not provided"}`,
       `Type de demande / Request type: ${request.mode === "live" ? "direct / live" : "suivi / follow-up"}`,
       "",
-      "Message / Message:",
+      "Message :",
       request.message
     ].join("\n");
 
