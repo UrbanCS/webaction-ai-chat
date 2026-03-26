@@ -569,18 +569,20 @@ apiRouter.post("/human-handoff", async (req, res) => {
       });
     }
 
-    const subjectPrefix = request.mode === "live" ? "Live support request" : "Website chat follow-up request";
+    const subjectPrefix = request.mode === "live"
+      ? "Demande de soutien en direct / Live support request"
+      : "Demande de suivi du clavardage / Chat follow-up request";
     const emailBody = [
-      `${subjectPrefix} for ${site.siteName}`,
+      `${subjectPrefix} - ${site.siteName}`,
       "",
-      `Site ID: ${site.siteId}`,
-      `Site URL: ${site.siteUrl}`,
-      `Visitor email: ${request.email}`,
-      `Visitor name: ${request.name || "Not provided"}`,
-      `Page URL: ${request.pageUrl || "Not provided"}`,
-      `Request mode: ${request.mode}`,
+      `Identifiant du site / Site ID: ${site.siteId}`,
+      `URL du site / Site URL: ${site.siteUrl}`,
+      `Courriel du visiteur / Visitor email: ${request.email}`,
+      `Nom du visiteur / Visitor name: ${request.name || "Non fourni / Not provided"}`,
+      `URL de la page / Page URL: ${request.pageUrl || "Non fournie / Not provided"}`,
+      `Type de demande / Request type: ${request.mode === "live" ? "direct / live" : "suivi / follow-up"}`,
       "",
-      "Message:",
+      "Message / Message:",
       request.message
     ].join("\n");
 
