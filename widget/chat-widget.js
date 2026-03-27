@@ -507,7 +507,18 @@
             saveChatState();
           }
         })
-        .catch(function () {
+        .catch(function (error) {
+          var normalizedError = error && error.message ? error.message.toLowerCase() : "";
+
+          if (normalizedError.indexOf("unknown conversationid") !== -1) {
+            hideTypingIndicator("agent");
+            appendMessage("system", "Cette conversation de clavardage en direct a été fermée.");
+            activeConversationId = null;
+            stopLivePolling();
+            saveChatState();
+            return;
+          }
+
           stopLivePolling();
         });
     }
