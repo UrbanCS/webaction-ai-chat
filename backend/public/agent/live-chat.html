@@ -49,12 +49,32 @@
       gap: 10px;
     }
     .conversation-item {
+      position: relative;
       padding: 12px;
       border: 1px solid #94a3b8;
       border-radius: 10px;
       background: #ffffff;
       color: #0f172a;
       cursor: pointer;
+    }
+    .conversation-delete {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #475569;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+    }
+    .conversation-delete:hover {
+      background: #fecaca;
+      color: #991b1b;
     }
     .conversation-item.active {
       border-color: #0f766e;
@@ -539,14 +559,46 @@
             var item = document.createElement("button");
             item.type = "button";
             item.className = "conversation-item" + (conversation.id === activeConversationId ? " active" : "");
-            item.innerHTML =
+            item.addEventListener("click", function () {
+              loadConversation(conversation.id);
+            });
+
+            var deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "conversation-delete";
+            deleteButton.title = "Supprimer ce clavardage";
+            deleteButton.textContent = "×";
+            deleteButton.addEventListener("click", function (event) {
+              event.stopPropagation();
+
+              var confirmed = window.confirm("Voulez-vous vraiment supprimer ce clavardage ? Cette action est irréversible.");
+              if (!confirmed) {
+                return;
+              }
+
+              api("/agent/live-chat/" + conversation.id, {
+                method: "DELETE"
+              }).then(function () {
+                if (activeConversationId === conversation.id) {
+                  activeConversationId = null;
+                  activeConversation = null;
+                  document.getElementById("conversationTitle").textContent = "Sélectionnez une conversation";
+                  document.getElementById("messages").innerHTML = "";
+                }
+
+                refreshConversations();
+              });
+            });
+
+            var info = document.createElement("div");
+            info.innerHTML =
               "<strong>" + (conversation.visitorName || "Visiteur") + "</strong><br>" +
               (conversation.visitorEmail || "Aucun courriel") + "<br>" +
               (conversation.siteName || conversation.siteId) + "<br>" +
               "Statut : " + formatConversationStatus(conversation.status);
-            item.addEventListener("click", function () {
-              loadConversation(conversation.id);
-            });
+
+            item.appendChild(deleteButton);
+            item.appendChild(info);
             list.appendChild(item);
           });
       }
