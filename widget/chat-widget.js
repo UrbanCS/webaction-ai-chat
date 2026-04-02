@@ -35,10 +35,11 @@
       ".wa-chat-typing-dot:nth-child(2){animation-delay:.15s}" +
       ".wa-chat-typing-dot:nth-child(3){animation-delay:.3s}" +
       ".wa-chat-composer-stack{display:flex;flex-direction:column;gap:8px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
-      ".wa-chat-attachment-row{display:flex;align-items:center;justify-content:space-between;gap:8px}" +
-      ".wa-chat-attach{border:none;background:#e2e8f0;color:#0f172a;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}" +
+      ".wa-chat-attachment-row{display:flex;align-items:center;gap:8px;min-height:22px}" +
+      ".wa-chat-attach{width:34px;height:34px;border:none;background:#e2e8f0;color:#0f172a;border-radius:10px;padding:0;cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}" +
+      ".wa-chat-attach:hover{background:#cbd5e1}" +
       ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-      ".wa-chat-form{display:flex;gap:10px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
+      ".wa-chat-form{display:flex;gap:10px}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
       ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}" +
       ".wa-chat-input{flex:1}" +
@@ -282,7 +283,9 @@
     var attachButton = document.createElement("button");
     attachButton.className = "wa-chat-attach";
     attachButton.type = "button";
-    attachButton.textContent = "Joindre";
+    attachButton.textContent = "📎";
+    attachButton.title = "Joindre un fichier";
+    attachButton.setAttribute("aria-label", "Joindre un fichier");
 
     var attachmentName = document.createElement("div");
     attachmentName.className = "wa-chat-attachment-name";
