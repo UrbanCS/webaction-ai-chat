@@ -156,6 +156,30 @@
       word-break: break-word;
       color: inherit;
     }
+    .attach-button {
+      width: 28px;
+      height: 34px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      border-radius: 8px;
+      padding: 4px 0 0;
+      cursor: pointer;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .attach-button:hover {
+      background: rgba(148, 163, 184, 0.14);
+      color: #0f172a;
+    }
+    .attach-button svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
     textarea {
       width: 100%;
       min-height: 80px;
@@ -331,7 +355,12 @@
       <h2 id="conversationTitle">Sélectionnez une conversation</h2>
       <div class="messages" id="messages"></div>
       <div class="attachment-row">
-        <button id="attachReply" class="secondary" type="button">Joindre</button>
+        <button id="attachReply" class="attach-button" type="button" aria-label="Joindre un fichier" title="Joindre un fichier">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M7 2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm6 2v4h4z"></path>
+            <path fill="#f8fafc" d="M8 12h8v1.6H8zm0 3.2h8v1.6H8zm0-6.4h4.5v1.6H8z"></path>
+          </svg>
+        </button>
         <input id="replyAttachment" type="file" accept="image/*,.txt,.md,.csv,.json" style="display:none;">
         <div class="attachment-name" id="replyAttachmentName"></div>
       </div>

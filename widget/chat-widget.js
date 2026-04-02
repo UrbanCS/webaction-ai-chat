@@ -37,14 +37,15 @@
       ".wa-chat-composer-stack{display:flex;flex-direction:column;gap:6px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
       ".wa-chat-attachment-row{display:none;align-items:center;gap:8px}" +
       ".wa-chat-attachment-row.wa-chat-attachment-row-active{display:flex}" +
-      ".wa-chat-attach{width:26px;height:26px;border:none;background:transparent;color:#64748b;border-radius:8px;padding:0;cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}" +
+      ".wa-chat-attach{width:28px;height:34px;border:none;background:transparent;color:#64748b;border-radius:8px;padding:4px 0 0;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}" +
       ".wa-chat-attach:hover{background:rgba(148,163,184,.14);color:#0f172a}" +
+      ".wa-chat-attach svg{width:22px;height:22px;display:block}" +
       ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-      ".wa-chat-form{display:flex;gap:10px}" +
+      ".wa-chat-form{display:flex;gap:6px}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
       ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}" +
-      ".wa-chat-input{flex:1}" +
-      ".wa-chat-send,.wa-chat-support-submit{border:none;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-radius:12px;padding:11px 16px;cursor:pointer;font-weight:700}" +
+      ".wa-chat-input{flex:1;min-width:0}" +
+      ".wa-chat-send,.wa-chat-support-submit{border:none;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:700;flex:0 0 auto}" +
       ".wa-chat-send:hover,.wa-chat-support-submit:hover{filter:brightness(1.03)}" +
       ".wa-chat-handoff-panel{margin:0 16px 14px;padding:14px;border:1px solid #a7f3d0;background:linear-gradient(180deg,#f0fdf4 0%,#ecfdf5 100%);border-radius:14px}" +
       ".wa-chat-handoff-copy{margin:0 0 10px;font-size:13px;line-height:1.45;color:#14532d}" +
@@ -284,7 +285,11 @@
     var attachButton = document.createElement("button");
     attachButton.className = "wa-chat-attach";
     attachButton.type = "button";
-    attachButton.textContent = "🗎";
+    attachButton.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M7 2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm6 2v4h4z"/>' +
+      '<path fill="#f8fafc" d="M8 12h8v1.6H8zm0 3.2h8v1.6H8zm0-6.4h4.5v1.6H8z"/>' +
+      '</svg>';
     attachButton.title = "Joindre un fichier";
     attachButton.setAttribute("aria-label", "Joindre un fichier");
 
@@ -319,7 +324,7 @@
     var input = document.createElement("input");
     input.className = "wa-chat-input";
     input.type = "text";
-    input.placeholder = "Écrivez votre message...";
+    input.placeholder = "Écrivez votre message";
 
     var send = document.createElement("button");
     send.className = "wa-chat-send";
