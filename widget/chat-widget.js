@@ -34,10 +34,11 @@
       ".wa-chat-typing-dot{width:7px;height:7px;border-radius:999px;background:#94a3b8;display:inline-block;animation:wa-chat-typing-bounce 1s infinite ease-in-out}" +
       ".wa-chat-typing-dot:nth-child(2){animation-delay:.15s}" +
       ".wa-chat-typing-dot:nth-child(3){animation-delay:.3s}" +
-      ".wa-chat-composer-stack{display:flex;flex-direction:column;gap:8px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
-      ".wa-chat-attachment-row{display:flex;align-items:center;gap:8px;min-height:22px}" +
-      ".wa-chat-attach{width:34px;height:34px;border:none;background:#e2e8f0;color:#0f172a;border-radius:10px;padding:0;cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}" +
-      ".wa-chat-attach:hover{background:#cbd5e1}" +
+      ".wa-chat-composer-stack{display:flex;flex-direction:column;gap:6px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
+      ".wa-chat-attachment-row{display:none;align-items:center;gap:8px}" +
+      ".wa-chat-attachment-row.wa-chat-attachment-row-active{display:flex}" +
+      ".wa-chat-attach{width:26px;height:26px;border:none;background:transparent;color:#64748b;border-radius:8px;padding:0;cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}" +
+      ".wa-chat-attach:hover{background:rgba(148,163,184,.14);color:#0f172a}" +
       ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
       ".wa-chat-form{display:flex;gap:10px}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
@@ -283,7 +284,7 @@
     var attachButton = document.createElement("button");
     attachButton.className = "wa-chat-attach";
     attachButton.type = "button";
-    attachButton.textContent = "📎";
+    attachButton.textContent = "🗎";
     attachButton.title = "Joindre un fichier";
     attachButton.setAttribute("aria-label", "Joindre un fichier");
 
@@ -296,7 +297,6 @@
     attachmentInput.accept = "image/*,.txt,.md,.csv,.json";
     attachmentInput.style.display = "none";
 
-    attachmentRow.appendChild(attachButton);
     attachmentRow.appendChild(attachmentName);
     attachmentRow.appendChild(attachmentInput);
 
@@ -326,6 +326,7 @@
     send.type = "submit";
     send.textContent = "Envoyer";
 
+    form.appendChild(attachButton);
     form.appendChild(input);
     form.appendChild(send);
 
@@ -399,6 +400,7 @@
     function setPendingAttachment(attachment) {
       pendingAttachment = attachment;
       attachmentName.textContent = attachment ? attachment.name : "";
+      attachmentRow.classList.toggle("wa-chat-attachment-row-active", Boolean(attachment));
       saveChatState();
     }
 
