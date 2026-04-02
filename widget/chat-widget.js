@@ -34,6 +34,10 @@
       ".wa-chat-typing-dot{width:7px;height:7px;border-radius:999px;background:#94a3b8;display:inline-block;animation:wa-chat-typing-bounce 1s infinite ease-in-out}" +
       ".wa-chat-typing-dot:nth-child(2){animation-delay:.15s}" +
       ".wa-chat-typing-dot:nth-child(3){animation-delay:.3s}" +
+      ".wa-chat-composer-stack{display:flex;flex-direction:column;gap:8px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
+      ".wa-chat-attachment-row{display:flex;align-items:center;justify-content:space-between;gap:8px}" +
+      ".wa-chat-attach{border:none;background:#e2e8f0;color:#0f172a;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}" +
+      ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
       ".wa-chat-form{display:flex;gap:10px;padding:14px;border-top:1px solid #e5e7eb;background:#fff}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
       ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}" +
@@ -60,15 +64,35 @@
     stylesInjected = true;
   }
 
-  function createMessage(role, text) {
+  function createMessage(role, text, options) {
+    var settings = options || {};
     var message = document.createElement("div");
     message.className = "wa-chat-message wa-chat-message-" + role;
 
     var bubble = document.createElement("div");
     bubble.className = "wa-chat-bubble";
-    bubble.textContent = text;
+    bubble.textContent = text || "";
 
     message.appendChild(bubble);
+
+    if (settings.attachment && settings.attachment.name) {
+      var attachmentLink = document.createElement("a");
+      attachmentLink.style.display = "block";
+      attachmentLink.style.marginTop = "8px";
+      attachmentLink.style.fontSize = "13px";
+      attachmentLink.style.wordBreak = "break-word";
+      attachmentLink.textContent = "Pièce jointe : " + settings.attachment.name;
+
+      if (settings.attachment.url) {
+        attachmentLink.href = settings.attachment.url;
+        attachmentLink.target = "_blank";
+        attachmentLink.rel = "noopener noreferrer";
+      } else {
+        attachmentLink.href = "#";
+      }
+
+      bubble.appendChild(attachmentLink);
+    }
 
     return message;
   }
@@ -98,6 +122,18 @@
     }
 
     return message.text;
+  }
+
+  function getAttachmentOnlyText(role) {
+    if (role === "agent") {
+      return "Pièce jointe envoyée.";
+    }
+
+    if (role === "user" || role === "visitor") {
+      return "Pièce jointe envoyée.";
+    }
+
+    return "Pièce jointe.";
   }
 
   function playNotificationSound() {
@@ -237,6 +273,30 @@
     handoffPanel.appendChild(handoffCopy);
     handoffPanel.appendChild(supportForm);
 
+    var composer = document.createElement("div");
+    composer.className = "wa-chat-composer-stack";
+
+    var attachmentRow = document.createElement("div");
+    attachmentRow.className = "wa-chat-attachment-row";
+
+    var attachButton = document.createElement("button");
+    attachButton.className = "wa-chat-attach";
+    attachButton.type = "button";
+    attachButton.textContent = "Joindre";
+
+    var attachmentName = document.createElement("div");
+    attachmentName.className = "wa-chat-attachment-name";
+    attachmentName.textContent = "";
+
+    var attachmentInput = document.createElement("input");
+    attachmentInput.type = "file";
+    attachmentInput.accept = "image/*,.txt,.md,.csv,.json";
+    attachmentInput.style.display = "none";
+
+    attachmentRow.appendChild(attachButton);
+    attachmentRow.appendChild(attachmentName);
+    attachmentRow.appendChild(attachmentInput);
+
     var form = document.createElement("form");
     form.className = "wa-chat-form";
     var lastUserMessage = "";
@@ -251,6 +311,7 @@
     var visitorTypingTimer = null;
     var lastVisitorTypingState = false;
     var displayedMessages = [];
+    var pendingAttachment = null;
 
     var input = document.createElement("input");
     input.className = "wa-chat-input";
@@ -269,7 +330,9 @@
     windowEl.appendChild(messages);
     windowEl.appendChild(settingsPanel);
     windowEl.appendChild(handoffPanel);
-    windowEl.appendChild(form);
+    composer.appendChild(attachmentRow);
+    composer.appendChild(form);
+    windowEl.appendChild(composer);
 
     root.appendChild(windowEl);
     root.appendChild(toggle);
@@ -315,9 +378,25 @@
     function renderStoredMessages() {
       messages.innerHTML = "";
       displayedMessages.forEach(function (item) {
-        messages.appendChild(createMessage(item.role, item.text));
+        messages.appendChild(createMessage(item.role, item.text, {
+          attachment: item.attachment || null
+        }));
       });
       messages.scrollTop = messages.scrollHeight;
+    }
+
+    function resolveAttachmentUrl(attachment) {
+      if (!attachment || !attachment.relativeUrl) {
+        return "";
+      }
+
+      return config.apiUrl.replace(/\/$/, "") + attachment.relativeUrl;
+    }
+
+    function setPendingAttachment(attachment) {
+      pendingAttachment = attachment;
+      attachmentName.textContent = attachment ? attachment.name : "";
+      saveChatState();
     }
 
     function toggleWindow(forceOpen) {
@@ -385,9 +464,12 @@
       var settings = options || {};
       displayedMessages.push({
         role: role,
-        text: text
+        text: text,
+        attachment: settings.attachment || null
       });
-      messages.appendChild(createMessage(role, text));
+      messages.appendChild(createMessage(role, text, {
+        attachment: settings.attachment || null
+      }));
       messages.scrollTop = messages.scrollHeight;
       saveChatState();
 
@@ -447,8 +529,21 @@
         hideTypingIndicator("agent");
       }
 
-      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, getLiveMessageText(message), {
-        notify: hasLivePollingStarted && message.senderType !== "visitor"
+      var attachment = message.attachment
+        ? {
+            name: message.attachment.name,
+            url: resolveAttachmentUrl(message.attachment)
+          }
+        : null;
+
+      var visibleText = getLiveMessageText(message);
+      if (!visibleText && attachment) {
+        visibleText = getAttachmentOnlyText(message.senderType === "visitor" ? "user" : message.senderType);
+      }
+
+      appendMessage(message.senderType === "visitor" ? "user" : message.senderType, visibleText, {
+        notify: hasLivePollingStarted && message.senderType !== "visitor",
+        attachment: attachment
       });
     }
 
@@ -663,6 +758,28 @@
       renderPreferences();
     });
 
+    attachButton.addEventListener("click", function () {
+      attachmentInput.click();
+    });
+
+    attachmentInput.addEventListener("change", function (event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) {
+        setPendingAttachment(null);
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        setPendingAttachment({
+          name: file.name,
+          type: file.type || "application/octet-stream",
+          dataUrl: String(reader.result || "")
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+
     supportCancel.addEventListener("click", function () {
       hideSupportPanel();
     });
@@ -684,7 +801,7 @@
         siteId: config.siteId,
         name: supportName.value.trim(),
         email: email,
-        message: supportMessage.value.trim() || lastUserMessage,
+        message: supportMessage.value.trim() || lastUserMessage || (pendingAttachment ? getAttachmentOnlyText("user") : ""),
         pageUrl: window.location.href
       };
 
@@ -703,7 +820,8 @@
             visitorName: payload.name,
             visitorEmail: payload.email,
             message: payload.message,
-            pageUrl: payload.pageUrl
+            pageUrl: payload.pageUrl,
+            attachment: pendingAttachment
           })
         })
           .then(function (response) {
@@ -717,6 +835,8 @@
           })
           .then(function (data) {
             appendMessage("system", "Le clavardage en direct a démarré. Une personne peut maintenant répondre ici.");
+            setPendingAttachment(null);
+            attachmentInput.value = "";
             hideSupportPanel();
             startLivePolling(data.conversationId, data.messages || []);
           })
@@ -741,7 +861,8 @@
           email: payload.email,
           message: payload.message,
           pageUrl: payload.pageUrl,
-          mode: "request"
+          mode: "request",
+          attachment: pendingAttachment
         })
       })
         .then(function (response) {
@@ -755,6 +876,8 @@
         })
         .then(function (data) {
           appendMessage("ai", data.reply || "Une demande de suivi humain a été envoyée.");
+          setPendingAttachment(null);
+          attachmentInput.value = "";
           hideSupportPanel();
         })
         .catch(function (error) {
@@ -769,12 +892,16 @@
       event.preventDefault();
 
       var message = input.value.trim();
-      if (!message) {
+      if (!message && !pendingAttachment) {
         return;
       }
 
       if (activeConversationId) {
-        appendMessage("user", message);
+        appendMessage("user", message || (pendingAttachment ? getAttachmentOnlyText("user") : ""), {
+          attachment: pendingAttachment
+            ? { name: pendingAttachment.name }
+            : null
+        });
         updateVisitorTypingState(false);
         input.value = "";
 
@@ -785,7 +912,8 @@
           },
           body: JSON.stringify({
             text: message,
-            senderName: preferences.visitorName
+            senderName: preferences.visitorName,
+            attachment: pendingAttachment
           })
         })
           .then(function (response) {
@@ -803,6 +931,8 @@
               lastLiveMessageAt = data.message.createdAt || lastLiveMessageAt;
               saveChatState();
             }
+            setPendingAttachment(null);
+            attachmentInput.value = "";
           })
           .catch(function (error) {
             appendMessage(
@@ -816,7 +946,11 @@
 
       lastUserMessage = message;
       hideSupportPanel();
-      appendMessage("user", message);
+      appendMessage("user", message || (pendingAttachment ? getAttachmentOnlyText("user") : ""), {
+        attachment: pendingAttachment
+          ? { name: pendingAttachment.name }
+          : null
+      });
       input.value = "";
       input.disabled = true;
       send.disabled = true;
@@ -835,7 +969,8 @@
         },
         body: JSON.stringify({
           message: message,
-          siteId: config.siteId
+          siteId: config.siteId,
+          attachment: pendingAttachment
         })
       })
         .then(function (response) {
@@ -859,15 +994,21 @@
                 : "Je n'ai pas trouvé de réponse fiable sur le site. Vous pouvez envoyer une demande à une personne."
             );
             showSupportPanel(data.humanHandoff);
+            setPendingAttachment(null);
+            attachmentInput.value = "";
             return;
           }
 
           if (shouldOpenHumanFlow) {
             openHumanSupportFlow();
+            setPendingAttachment(null);
+            attachmentInput.value = "";
             return;
           }
 
           appendMessage("ai", data.reply || "Aucune réponse n'a été retournée.", { notify: true });
+          setPendingAttachment(null);
+          attachmentInput.value = "";
         })
         .catch(function (error) {
           hideTypingIndicator("ai");

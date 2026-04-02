@@ -136,6 +136,26 @@
       display: flex;
       gap: 8px;
     }
+    .attachment-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .attachment-name {
+      font-size: 12px;
+      color: #475569;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .attachment-link {
+      display: block;
+      margin-top: 8px;
+      font-size: 13px;
+      word-break: break-word;
+      color: inherit;
+    }
     textarea {
       width: 100%;
       min-height: 80px;
@@ -310,6 +330,11 @@
     <main class="main">
       <h2 id="conversationTitle">Sélectionnez une conversation</h2>
       <div class="messages" id="messages"></div>
+      <div class="attachment-row">
+        <button id="attachReply" class="secondary" type="button">Joindre</button>
+        <input id="replyAttachment" type="file" accept="image/*,.txt,.md,.csv,.json" style="display:none;">
+        <div class="attachment-name" id="replyAttachmentName"></div>
+      </div>
       <div class="composer">
         <textarea id="replyText" placeholder="Écrivez une réponse..."></textarea>
       </div>
@@ -337,6 +362,7 @@
       var typingTimer = null;
       var lastTypingState = false;
       var preferences = loadPreferences();
+      var pendingAttachment = null;
 
       function loadPreferences() {
         try {
@@ -493,6 +519,14 @@
         });
       }
 
+      function getAttachmentOnlyText(message) {
+        if (!message || !message.attachment) {
+          return "";
+        }
+
+        return "Pièce jointe envoyée.";
+      }
+
       function renderMessages(messages) {
         var container = document.getElementById("messages");
         container.innerHTML = "";
@@ -512,9 +546,20 @@
           }
 
           var content = document.createElement("div");
-          content.textContent = message.text;
+          content.textContent = message.text || getAttachmentOnlyText(message);
           el.appendChild(label);
           el.appendChild(content);
+
+          if (message.attachment && message.attachment.relativeUrl) {
+            var attachmentLink = document.createElement("a");
+            attachmentLink.className = "attachment-link";
+            attachmentLink.href = basePath + message.attachment.relativeUrl;
+            attachmentLink.target = "_blank";
+            attachmentLink.rel = "noopener noreferrer";
+            attachmentLink.textContent = "Pièce jointe : " + message.attachment.name;
+            el.appendChild(attachmentLink);
+          }
+
           container.appendChild(el);
         });
 
@@ -672,7 +717,7 @@
 
       document.getElementById("sendReply").addEventListener("click", function () {
         var text = document.getElementById("replyText").value.trim();
-        if (!activeConversationId || !text) {
+        if (!activeConversationId || (!text && !pendingAttachment)) {
           return;
         }
 
@@ -682,10 +727,14 @@
           method: "POST",
           body: JSON.stringify({
             text: text,
-            senderName: preferences.agentName
+            senderName: preferences.agentName,
+            attachment: pendingAttachment
           })
         }).then(function () {
           document.getElementById("replyText").value = "";
+          pendingAttachment = null;
+          document.getElementById("replyAttachment").value = "";
+          document.getElementById("replyAttachmentName").textContent = "";
           loadConversation(activeConversationId);
         });
       });
@@ -710,6 +759,30 @@
             updateTypingState(false);
           }, 2500);
         }
+      });
+
+      document.getElementById("attachReply").addEventListener("click", function () {
+        document.getElementById("replyAttachment").click();
+      });
+
+      document.getElementById("replyAttachment").addEventListener("change", function (event) {
+        var file = event.target.files && event.target.files[0];
+        if (!file) {
+          pendingAttachment = null;
+          document.getElementById("replyAttachmentName").textContent = "";
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function () {
+          pendingAttachment = {
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            dataUrl: String(reader.result || "")
+          };
+          document.getElementById("replyAttachmentName").textContent = file.name;
+        };
+        reader.readAsDataURL(file);
       });
 
       document.getElementById("closeConversation").addEventListener("click", function () {

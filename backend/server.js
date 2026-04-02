@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const OpenAI = require("openai");
+const fs = require("fs");
 const path = require("path");
 const {
   getSiteIndexStatus,
@@ -19,6 +20,12 @@ const {
 } = require("./services/siteRegistryService");
 const { createHandoffRequest } = require("./services/humanHandoffService");
 const { sendHumanHandoffEmail } = require("./services/emailService");
+const {
+  ensureUploadsDirectory,
+  extractTextFromAttachment,
+  isAiReadableAttachment,
+  saveAttachment
+} = require("./services/attachmentService");
 const {
   addMessageToConversation,
   closeConversation,
@@ -39,6 +46,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const widgetDirectory = path.join(__dirname, "..", "widget");
 const agentUiDirectory = path.join(__dirname, "public", "agent");
+const uploadsDirectory = path.join(__dirname, "data", "uploads");
 const apiRouter = express.Router();
 const humanFallbackEmail = process.env.HUMAN_FALLBACK_EMAIL || "";
 const defaultSupportEmail = process.env.DEFAULT_SUPPORT_EMAIL || humanFallbackEmail || "";
@@ -55,7 +63,7 @@ const openai = new OpenAI({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 
 app.set("trust proxy", true);
 
@@ -105,6 +113,14 @@ function sanitizeSite(site) {
 
 function buildDashboardUrl(baseUrl, siteId, dashboardKey) {
   return `${baseUrl}/agent/live-chat.html?siteId=${encodeURIComponent(siteId)}&key=${encodeURIComponent(dashboardKey)}`;
+}
+
+function saveIncomingAttachment(attachment, prefix) {
+  if (!attachment) {
+    return null;
+  }
+
+  return saveAttachment(attachment, prefix);
 }
 
 function getAgentAccessContext(req) {
@@ -199,6 +215,8 @@ function isGreetingMessage(message) {
 
 apiRouter.use("/widget", express.static(widgetDirectory));
 apiRouter.use("/agent", express.static(agentUiDirectory));
+ensureUploadsDirectory();
+apiRouter.use("/uploads", express.static(uploadsDirectory));
 
 apiRouter.get("/health", (_req, res) => {
   res.json({
@@ -325,6 +343,7 @@ apiRouter.post("/live-chat/start", (req, res) => {
   const visitorName = typeof req.body.visitorName === "string" ? req.body.visitorName.trim() : "";
   const visitorEmail = typeof req.body.visitorEmail === "string" ? req.body.visitorEmail.trim() : "";
   const initialMessage = typeof req.body.message === "string" ? req.body.message.trim() : "";
+  const attachmentInput = req.body.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
   const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
   const site = findSiteBySiteId(siteId);
   const agentStatus = getSiteAgentStatus(siteId);
@@ -340,6 +359,7 @@ apiRouter.post("/live-chat/start", (req, res) => {
   }
 
   try {
+    const attachment = saveIncomingAttachment(attachmentInput, `conversation-start-${siteId}`);
     const conversation = createConversation({
       siteId,
       siteName: site.siteName,
@@ -347,7 +367,8 @@ apiRouter.post("/live-chat/start", (req, res) => {
       visitorName,
       visitorEmail,
       pageUrl,
-      initialMessage
+      initialMessage,
+      attachment
     });
 
     addMessageToConversation(conversation.id, {
@@ -392,12 +413,15 @@ apiRouter.post("/live-chat/:conversationId/messages", (req, res) => {
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
   const senderName = typeof req.body.senderName === "string" ? req.body.senderName.trim() : "";
+  const attachmentInput = req.body.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
 
   try {
+    const attachment = saveIncomingAttachment(attachmentInput, `visitor-${conversationId}`);
     const result = addMessageToConversation(conversationId, {
       senderType: "visitor",
       text,
-      senderName
+      senderName,
+      attachment
     });
 
     return res.json({
@@ -486,6 +510,7 @@ apiRouter.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (r
   const conversationId = typeof req.params.conversationId === "string" ? req.params.conversationId.trim() : "";
   const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
   const senderName = typeof req.body.senderName === "string" ? req.body.senderName.trim() : "";
+  const attachmentInput = req.body.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
 
   try {
     const existingConversation = findConversationById(conversationId);
@@ -493,10 +518,12 @@ apiRouter.post("/agent/live-chat/:conversationId/messages", requireAgentAuth, (r
       return res.status(403).json({ error: "Conversation access denied" });
     }
 
+    const attachment = saveIncomingAttachment(attachmentInput, `agent-${conversationId}`);
     const result = addMessageToConversation(conversationId, {
       senderType: "agent",
       text,
-      senderName
+      senderName,
+      attachment
     });
 
     return res.json({
@@ -581,6 +608,7 @@ apiRouter.post("/human-handoff", async (req, res) => {
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
   const pageUrl = typeof req.body.pageUrl === "string" ? req.body.pageUrl.trim() : "";
   const mode = typeof req.body.mode === "string" ? req.body.mode.trim() : "";
+  const attachmentInput = req.body.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
   const site = findSiteBySiteId(siteId);
 
   if (!site) {
@@ -588,6 +616,7 @@ apiRouter.post("/human-handoff", async (req, res) => {
   }
 
   try {
+    const attachment = saveIncomingAttachment(attachmentInput, `handoff-${siteId}`);
     const request = createHandoffRequest({
       siteId,
       siteName: site.siteName,
@@ -596,7 +625,8 @@ apiRouter.post("/human-handoff", async (req, res) => {
       email,
       name,
       pageUrl,
-      mode
+      mode,
+      attachment
     });
 
     const recipientEmail = site.supportEmail || defaultSupportEmail;
@@ -609,6 +639,9 @@ apiRouter.post("/human-handoff", async (req, res) => {
     const subjectPrefix = request.mode === "live"
       ? "Demande de soutien en direct / Live support request"
       : "Demande de suivi du clavardage / Chat follow-up request";
+    const attachmentUrl = request.attachment
+      ? `${getBaseUrl(req)}${request.attachment.relativeUrl}`
+      : "";
     const emailBody = [
       `${subjectPrefix} - ${site.siteName}`,
       "",
@@ -618,10 +651,13 @@ apiRouter.post("/human-handoff", async (req, res) => {
       `Nom du visiteur / Visitor name: ${request.name || "Non fourni / Not provided"}`,
       `URL de la page / Page URL: ${request.pageUrl || "Non fournie / Not provided"}`,
       `Type de demande / Request type: ${request.mode === "live" ? "direct / live" : "suivi / follow-up"}`,
+      request.attachment
+        ? `Pièce jointe / Attachment: ${request.attachment.name}${attachmentUrl ? `\nLien / Link: ${attachmentUrl}` : ""}`
+        : null,
       "",
       "Message :",
       request.message
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 
     await sendHumanHandoffEmail({
       to: recipientEmail,
@@ -647,9 +683,10 @@ apiRouter.post("/human-handoff", async (req, res) => {
 apiRouter.post("/chat", async (req, res) => {
   const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
   const siteId = typeof req.body.siteId === "string" ? req.body.siteId.trim() : "";
+  const attachmentInput = req.body.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
 
-  if (!message) {
-    return res.status(400).json({ error: "message is required" });
+  if (!message && !attachmentInput) {
+    return res.status(400).json({ error: "message or attachment is required" });
   }
 
   if (!siteId) {
@@ -663,6 +700,12 @@ apiRouter.post("/chat", async (req, res) => {
   }
 
   try {
+    if (attachmentInput && !isAiReadableAttachment(attachmentInput)) {
+      return res.status(400).json({
+        error: "L'IA peut lire les images et les fichiers texte simples dans cette version."
+      });
+    }
+
     if (isGreetingMessage(message)) {
       return res.json({
         reply: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
@@ -689,35 +732,73 @@ apiRouter.post("/chat", async (req, res) => {
       });
     }
 
+    const attachmentText = attachmentInput ? extractTextFromAttachment(attachmentInput) : "";
+    const hasImageAttachment = Boolean(
+      attachmentInput &&
+      typeof attachmentInput.dataUrl === "string" &&
+      attachmentInput.dataUrl.indexOf("data:image/") === 0
+    );
+    const userPrompt = message || "Analyse cette pièce jointe.";
+    const messagesPayload = [
+      {
+        role: "system",
+        content:
+          "You are a helpful website assistant for a Webaction client website. " +
+          "Prefer the retrieved website content over general knowledge. " +
+          "Always answer in the same language as the user when possible. " +
+          "Be concise and practical. " +
+          "For broad questions about what the site offers, what the company does, or what services are available, summarize the site's apparent offer based on the retrieved content even if the exact wording does not match the user's question. " +
+          "If the retrieved content does not directly support the answer, say that the information was not found on the website. " +
+          "Never invent services, pricing, hours, contact details, policies, or any other site details that are not supported by the retrieved content. " +
+          "If relevant information is missing from the retrieved content, explicitly say it was not found on the website."
+      },
+      {
+        role: "system",
+        content:
+          `Site ID: ${siteId}\n` +
+          `Site name: ${retrievalResult.site.siteName}\n` +
+          `Site URL: ${retrievalResult.site.siteUrl}\n\n` +
+          "Relevant site content:\n" +
+          contextBlocks
+      }
+    ];
+
+    if (attachmentText) {
+      messagesPayload.push({
+        role: "system",
+        content:
+          `User attached a file named "${attachmentInput.name || "attachment"}". ` +
+          "Use it as additional context only if it helps answer the question.\n\n" +
+          attachmentText
+      });
+    }
+
+    messagesPayload.push(
+      hasImageAttachment
+        ? {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: userPrompt
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: attachmentInput.dataUrl
+                }
+              }
+            ]
+          }
+        : {
+            role: "user",
+            content: userPrompt
+          }
+    );
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful website assistant for a Webaction client website. " +
-            "Prefer the retrieved website content over general knowledge. " +
-            "Always answer in the same language as the user when possible. " +
-            "Be concise and practical. " +
-            "For broad questions about what the site offers, what the company does, or what services are available, summarize the site's apparent offer based on the retrieved content even if the exact wording does not match the user's question. " +
-            "If the retrieved content does not directly support the answer, say that the information was not found on the website. " +
-            "Never invent services, pricing, hours, contact details, policies, or any other site details that are not supported by the retrieved content. " +
-            "If relevant information is missing from the retrieved content, explicitly say it was not found on the website."
-        },
-        {
-          role: "system",
-          content:
-            `Site ID: ${siteId}\n` +
-            `Site name: ${retrievalResult.site.siteName}\n` +
-            `Site URL: ${retrievalResult.site.siteUrl}\n\n` +
-            "Relevant site content:\n" +
-            contextBlocks
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ]
+      messages: messagesPayload
     });
 
     const reply = completion.choices[0]?.message?.content?.trim();

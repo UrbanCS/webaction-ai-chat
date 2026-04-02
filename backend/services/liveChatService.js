@@ -97,7 +97,7 @@ function findConversationById(conversationId) {
   return listConversations().find((conversation) => conversation.id === conversationId) || null;
 }
 
-function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEmail, pageUrl, initialMessage }) {
+function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEmail, pageUrl, initialMessage, attachment }) {
   if (!siteId) {
     const error = new Error("siteId is required");
     error.statusCode = 400;
@@ -110,8 +110,8 @@ function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEma
     throw error;
   }
 
-  if (!initialMessage || !initialMessage.trim()) {
-    const error = new Error("initialMessage is required");
+  if ((!initialMessage || !initialMessage.trim()) && !attachment) {
+    const error = new Error("initialMessage or attachment is required");
     error.statusCode = 400;
     throw error;
   }
@@ -137,11 +137,15 @@ function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEma
       {
         id: `message-${Date.now()}`,
         senderType: "visitor",
-        text: initialMessage.trim(),
+        text: initialMessage && initialMessage.trim() ? initialMessage.trim() : "",
         createdAt: new Date().toISOString()
       }
     ]
   };
+
+  if (attachment) {
+    conversation.messages[0].attachment = attachment;
+  }
 
   conversations.push(conversation);
   saveConversations(conversations);
@@ -149,9 +153,9 @@ function createConversation({ siteId, siteName, siteUrl, visitorName, visitorEma
   return conversation;
 }
 
-function addMessageToConversation(conversationId, { senderType, text, senderName }) {
-  if (!text || !text.trim()) {
-    const error = new Error("text is required");
+function addMessageToConversation(conversationId, { senderType, text, senderName, attachment }) {
+  if ((!text || !text.trim()) && !attachment) {
+    const error = new Error("text or attachment is required");
     error.statusCode = 400;
     throw error;
   }
@@ -174,12 +178,16 @@ function addMessageToConversation(conversationId, { senderType, text, senderName
   const message = {
     id: `message-${Date.now()}-${conversation.messages.length + 1}`,
     senderType,
-    text: text.trim(),
+    text: text && text.trim() ? text.trim() : "",
     createdAt: new Date().toISOString()
   };
 
   if (senderName && typeof senderName === "string" && senderName.trim()) {
     message.senderName = senderName.trim();
+  }
+
+  if (attachment) {
+    message.attachment = attachment;
   }
 
   if (!conversation.typing || typeof conversation.typing !== "object") {

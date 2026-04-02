@@ -26,14 +26,14 @@ function saveHandoffRequests(requests) {
   fs.writeFileSync(handoffFilePath, `${JSON.stringify(requests, null, 2)}\n`, "utf8");
 }
 
-function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name, pageUrl, mode }) {
+function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name, pageUrl, mode, attachment }) {
   if (!siteId) {
     const error = new Error("siteId is required");
     error.statusCode = 400;
     throw error;
   }
 
-  if (!message || typeof message !== "string" || !message.trim()) {
+  if ((!message || typeof message !== "string" || !message.trim()) && !attachment) {
     const error = new Error("message is required");
     error.statusCode = 400;
     throw error;
@@ -59,13 +59,17 @@ function createHandoffRequest({ siteId, siteName, siteUrl, message, email, name,
     siteName: siteName || null,
     siteUrl: siteUrl || null,
     mode: mode === "live" ? "live" : "request",
-    message: message.trim(),
+    message: typeof message === "string" && message.trim() ? message.trim() : "Pièce jointe envoyée.",
     email: normalizedEmail,
     name: typeof name === "string" && name.trim() ? name.trim() : null,
     pageUrl: typeof pageUrl === "string" && pageUrl.trim() ? pageUrl.trim() : null,
     createdAt: new Date().toISOString(),
     status: "new"
   };
+
+  if (attachment && typeof attachment === "object") {
+    request.attachment = attachment;
+  }
 
   requests.push(request);
   saveHandoffRequests(requests);
