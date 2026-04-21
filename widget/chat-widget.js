@@ -2,7 +2,14 @@
   var defaultConfig = {
     apiUrl: "http://localhost:3000",
     siteId: "",
-    title: "Assistant IA"
+    title: "Assistant IA",
+    buttonText: "",
+    welcomeMessage: "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin.",
+    inputPlaceholder: "Écrivez votre message...",
+    sendButtonText: "Envoyer",
+    primaryColor: "#0f766e",
+    primaryDarkColor: "#115e59",
+    headerDarkColor: "#134e4a"
   };
 
   var stylesInjected = false;
@@ -15,10 +22,10 @@
     var style = document.createElement("style");
     style.textContent =
       ".wa-chat-root{position:fixed;right:20px;bottom:20px;z-index:999999;font-family:Arial,sans-serif;color:#1f2937}" +
-      ".wa-chat-toggle{min-width:148px;height:60px;padding:0 22px;border:none;border-radius:999px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;font-size:16px;font-weight:800;letter-spacing:.01em;cursor:pointer;box-shadow:0 20px 44px rgba(15,118,110,.34);line-height:1.1}" +
+      ".wa-chat-toggle{min-width:148px;height:60px;padding:0 22px;border:none;border-radius:999px;background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-primary-dark,#115e59));color:#fff;font-size:16px;font-weight:800;letter-spacing:.01em;cursor:pointer;box-shadow:0 20px 44px var(--wa-chat-primary-shadow,rgba(15,118,110,.34));line-height:1.1}" +
       ".wa-chat-window{position:absolute;right:0;bottom:80px;width:360px;height:500px;display:flex;flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.2);overflow:hidden}" +
       ".wa-chat-hidden{display:none}" +
-      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;justify-content:space-between;gap:10px}" +
+      ".wa-chat-header{padding:16px 18px;background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-header-dark,#134e4a));color:#fff;font-weight:700;font-size:16px;letter-spacing:.01em;display:flex;align-items:center;justify-content:space-between;gap:10px}" +
       ".wa-chat-header-title{display:flex;align-items:center;gap:10px}" +
       ".wa-chat-header-badge{width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.16);display:inline-flex;align-items:center;justify-content:center;font-size:15px}" +
       ".wa-chat-header-actions{display:flex;align-items:center;gap:8px}" +
@@ -27,7 +34,7 @@
       ".wa-chat-message{margin-bottom:14px;display:flex}" +
       ".wa-chat-message-user{justify-content:flex-end}" +
       ".wa-chat-bubble{max-width:85%;padding:11px 14px;border-radius:16px;line-height:1.45;font-size:14px;white-space:pre-wrap;box-shadow:0 6px 18px rgba(15,23,42,.06)}" +
-      ".wa-chat-message-user .wa-chat-bubble{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-bottom-right-radius:5px}" +
+      ".wa-chat-message-user .wa-chat-bubble{background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-primary-dark,#115e59));color:#fff;border-bottom-right-radius:5px}" +
       ".wa-chat-message-ai .wa-chat-bubble,.wa-chat-message-agent .wa-chat-bubble{background:#ffffff;color:#0f172a;border:1px solid #dbe4ea;border-bottom-left-radius:5px}" +
       ".wa-chat-message-system .wa-chat-bubble{background:#fef3c7;color:#78350f;border:1px solid #fcd34d}" +
       ".wa-chat-message-typing .wa-chat-bubble{display:flex;align-items:center;gap:5px;min-width:54px}" +
@@ -43,9 +50,9 @@
       ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
       ".wa-chat-form{display:flex;gap:6px}" +
       ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
-      ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}" +
+      ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:var(--wa-chat-primary,#0f766e);box-shadow:0 0 0 3px var(--wa-chat-focus-shadow,rgba(15,118,110,.12))}" +
       ".wa-chat-input{flex:1;min-width:0}" +
-      ".wa-chat-send,.wa-chat-support-submit{border:none;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:700;flex:0 0 auto}" +
+      ".wa-chat-send,.wa-chat-support-submit{border:none;background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-primary-dark,#115e59));color:#fff;border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:700;flex:0 0 auto}" +
       ".wa-chat-send:hover,.wa-chat-support-submit:hover{filter:brightness(1.03)}" +
       ".wa-chat-handoff-panel{margin:0 16px 14px;padding:14px;border:1px solid #a7f3d0;background:linear-gradient(180deg,#f0fdf4 0%,#ecfdf5 100%);border-radius:14px}" +
       ".wa-chat-handoff-copy{margin:0 0 10px;font-size:13px;line-height:1.45;color:#14532d}" +
@@ -177,6 +184,52 @@
     );
   }
 
+  function hexToRgba(hexColor, opacity) {
+    var normalized = String(hexColor || "").trim();
+    var match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(normalized);
+    if (!match) {
+      return "";
+    }
+
+    var value = match[1];
+    if (value.length === 3) {
+      value = value.split("").map(function (char) {
+        return char + char;
+      }).join("");
+    }
+
+    var red = parseInt(value.slice(0, 2), 16);
+    var green = parseInt(value.slice(2, 4), 16);
+    var blue = parseInt(value.slice(4, 6), 16);
+
+    return "rgba(" + red + "," + green + "," + blue + "," + opacity + ")";
+  }
+
+  function hasOwnConfig(config, key) {
+    return Object.prototype.hasOwnProperty.call(config || {}, key);
+  }
+
+  function applyTheme(root, config, userConfig) {
+    var suppliedConfig = userConfig || {};
+    var primaryColor = config.primaryColor || defaultConfig.primaryColor;
+    var primaryDarkColor = hasOwnConfig(suppliedConfig, "primaryDarkColor")
+      ? config.primaryDarkColor
+      : hasOwnConfig(suppliedConfig, "primaryColor")
+        ? primaryColor
+        : defaultConfig.primaryDarkColor;
+    var headerDarkColor = hasOwnConfig(suppliedConfig, "headerDarkColor")
+      ? config.headerDarkColor
+      : hasOwnConfig(suppliedConfig, "primaryColor")
+        ? primaryDarkColor
+        : defaultConfig.headerDarkColor;
+
+    root.style.setProperty("--wa-chat-primary", primaryColor);
+    root.style.setProperty("--wa-chat-primary-dark", primaryDarkColor);
+    root.style.setProperty("--wa-chat-header-dark", headerDarkColor);
+    root.style.setProperty("--wa-chat-primary-shadow", hexToRgba(primaryColor, 0.34) || "rgba(15,118,110,.34)");
+    root.style.setProperty("--wa-chat-focus-shadow", hexToRgba(primaryColor, 0.12) || "rgba(15,118,110,.12)");
+  }
+
   function init(userConfig) {
     var config = Object.assign({}, defaultConfig, userConfig || {});
     if (!config.siteId) {
@@ -193,12 +246,13 @@
     var root = document.createElement("div");
     root.id = "wa-chat-root";
     root.className = "wa-chat-root";
+    applyTheme(root, config, userConfig);
 
     var toggle = document.createElement("button");
     toggle.className = "wa-chat-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-label", "Ouvrir le clavardage IA");
-    toggle.textContent = config.title;
+    toggle.textContent = config.buttonText || config.title;
 
     var windowEl = document.createElement("div");
     windowEl.className = "wa-chat-window wa-chat-hidden";
@@ -324,12 +378,12 @@
     var input = document.createElement("input");
     input.className = "wa-chat-input";
     input.type = "text";
-    input.placeholder = "Écrivez votre message";
+    input.placeholder = config.inputPlaceholder;
 
     var send = document.createElement("button");
     send.className = "wa-chat-send";
     send.type = "submit";
-    send.textContent = "Envoyer";
+    send.textContent = config.sendButtonText;
 
     form.appendChild(attachButton);
     form.appendChild(input);
@@ -1064,7 +1118,7 @@
     seenLiveMessageIds = restoredState.seenLiveMessageIds || {};
 
     if (displayedMessages.length === 0) {
-      appendMessage("ai", "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin.");
+      appendMessage("ai", config.welcomeMessage);
     } else {
       renderStoredMessages();
       if (currentHandoff) {
