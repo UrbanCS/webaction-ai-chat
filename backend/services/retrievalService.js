@@ -76,9 +76,52 @@ function tokenize(text) {
   return (normalizeText(text).match(/[a-z0-9]{2,}/g) || []).filter((token) => !STOP_WORDS.has(token));
 }
 
+function uniqueValues(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function extractContactFactsFromText(text) {
+  const bodyText = String(text || "");
+  const emails = uniqueValues(bodyText.match(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>.,;:!?]+/g) || []);
+  const phoneMatches = bodyText.match(/(?:\+?\d[\d\s().-]{6,}\d)/g) || [];
+  const phones = uniqueValues(
+    phoneMatches
+      .map((phone) => phone.replace(/\s+/g, " ").trim())
+      .filter((phone) => {
+        const digits = phone.replace(/\D/g, "");
+        return digits.length >= 7 && digits.length <= 15;
+      })
+  );
+
+  return {
+    emails,
+    phones
+  };
+}
+
+function extractContactFactsFromPages(pages) {
+  const facts = pages.reduce(
+    (currentFacts, page) => {
+      const pageFacts = extractContactFactsFromText(page.text);
+      currentFacts.emails.push(...pageFacts.emails);
+      currentFacts.phones.push(...pageFacts.phones);
+      return currentFacts;
+    },
+    {
+      emails: [],
+      phones: []
+    }
+  );
+
+  return {
+    emails: uniqueValues(facts.emails),
+    phones: uniqueValues(facts.phones)
+  };
+}
+
 function scoreChunk(chunkText, queryText) {
   const chunkTokens = new Set(tokenize(chunkText));
-  const queryTokens = tokenize(queryText);
+  const queryTokens = tokenize(expandQueryText(queryText));
 
   if (queryTokens.length === 0) {
     return 0;
@@ -100,6 +143,25 @@ function scoreChunk(chunkText, queryText) {
   return score;
 }
 
+function expandQueryText(queryText) {
+  const normalizedQuery = normalizeText(queryText);
+  const expansions = [];
+
+  if (/\b(tel|telephone|phone|numero|appeler|appel)\b/.test(normalizedQuery)) {
+    expansions.push("telephone téléphone tel phone numero numéro appeler appel");
+  }
+
+  if (/\b(courriel|email|e-mail|mail|contacter|contact|joindre|rejoindre)\b/.test(normalizedQuery)) {
+    expansions.push("courriel email mail contact contacter joindre rejoindre telephone téléphone adresse");
+  }
+
+  if (/\b(adresse|bureau|office|location|situe|situé)\b/.test(normalizedQuery)) {
+    expansions.push("adresse bureau principal head office location situé situe");
+  }
+
+  return [queryText, ...expansions].join(" ");
+}
+
 function buildSiteIndex(siteId, siteConfig, crawlResult) {
   const pages = crawlResult.pages
     .map((page) => ({
@@ -115,6 +177,7 @@ function buildSiteIndex(siteId, siteConfig, crawlResult) {
     siteUrl: siteConfig.siteUrl,
     pages,
     chunks,
+    contactFacts: extractContactFactsFromPages(pages),
     indexedAt: new Date().toISOString()
   };
 
@@ -140,7 +203,8 @@ async function indexSite(siteId, options = {}) {
     siteUrl: index.siteUrl,
     indexedAt: index.indexedAt,
     pageCount: index.pages.length,
-    chunkCount: index.chunks.length
+    chunkCount: index.chunks.length,
+    contactFacts: index.contactFacts
   };
 }
 
@@ -156,7 +220,11 @@ function getSiteIndexStatus(siteId) {
     indexed: Boolean(cachedIndex),
     indexedAt: cachedIndex?.indexedAt || null,
     pageCount: cachedIndex?.pages.length || 0,
-    chunkCount: cachedIndex?.chunks.length || 0
+    chunkCount: cachedIndex?.chunks.length || 0,
+    contactFacts: cachedIndex?.contactFacts || {
+      emails: [],
+      phones: []
+    }
   };
 }
 
@@ -171,7 +239,11 @@ async function retrieveRelevantChunks(siteId, message, options = {}) {
   if (!cachedIndex || cachedIndex.chunks.length === 0) {
     return {
       site: getSiteIndexStatus(siteId),
-      chunks: []
+      chunks: [],
+      contactFacts: {
+        emails: [],
+        phones: []
+      }
     };
   }
 
@@ -193,7 +265,11 @@ async function retrieveRelevantChunks(siteId, message, options = {}) {
 
   return {
     site: getSiteIndexStatus(siteId),
-    chunks: fallbackChunks
+    chunks: fallbackChunks,
+    contactFacts: cachedIndex.contactFacts || {
+      emails: [],
+      phones: []
+    }
   };
 }
 

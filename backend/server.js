@@ -213,6 +213,97 @@ function isGreetingMessage(message) {
   return /^(bonjour|bonsoir|salut|allo|hello|hi|hey)\b[!.? ]*$/i.test(message.trim());
 }
 
+function normalizeIntentText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function joinHumanList(values) {
+  if (!values.length) {
+    return "";
+  }
+
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  return `${values.slice(0, -1).join(", ")} et ${values[values.length - 1]}`;
+}
+
+function uniqueValues(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function extractContactFactsFromText(text) {
+  const bodyText = String(text || "");
+  const emails = uniqueValues(bodyText.match(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>.,;:!?]+/g) || []);
+  const phoneMatches = bodyText.match(/(?:\+?\d[\d\s().-]{6,}\d)/g) || [];
+  const phones = uniqueValues(
+    phoneMatches
+      .map((phone) => phone.replace(/\s+/g, " ").trim())
+      .filter((phone) => {
+        const digits = phone.replace(/\D/g, "");
+        return digits.length >= 7 && digits.length <= 15;
+      })
+  );
+
+  return {
+    emails,
+    phones
+  };
+}
+
+function getDirectContactReply(message, retrievalResult) {
+  const normalizedMessage = normalizeIntentText(message);
+  const contactFacts = retrievalResult.contactFacts || retrievalResult.site.contactFacts || {};
+  const chunkContactFacts = extractContactFactsFromText(
+    (retrievalResult.chunks || []).map((chunk) => chunk.text).join("\n")
+  );
+  const phones = uniqueValues([
+    ...(Array.isArray(contactFacts.phones) ? contactFacts.phones : []),
+    ...chunkContactFacts.phones
+  ]);
+  const emails = uniqueValues([
+    ...(Array.isArray(contactFacts.emails) ? contactFacts.emails : []),
+    ...chunkContactFacts.emails
+  ]);
+  const asksPhone = /\b(tel|telephone|phone|numero|appeler|appel)\b/.test(normalizedMessage);
+  const asksEmail = /\b(courriel|email|e-mail|mail)\b/.test(normalizedMessage);
+  const asksContact = /\b(contact|contacter|joindre|rejoindre)\b/.test(normalizedMessage);
+
+  if (asksPhone && phones.length) {
+    return phones.length === 1
+      ? `Le numéro de téléphone indiqué sur le site est : ${phones[0]}.`
+      : `Les numéros de téléphone indiqués sur le site sont : ${joinHumanList(phones)}.`;
+  }
+
+  if (asksEmail && emails.length) {
+    return emails.length === 1
+      ? `Le courriel indiqué sur le site est : ${emails[0]}.`
+      : `Les courriels indiqués sur le site sont : ${joinHumanList(emails)}.`;
+  }
+
+  if (asksContact && (phones.length || emails.length)) {
+    const lines = [];
+    if (phones.length) {
+      lines.push(phones.length === 1
+        ? `Téléphone : ${phones[0]}`
+        : `Téléphones : ${joinHumanList(phones)}`);
+    }
+    if (emails.length) {
+      lines.push(emails.length === 1
+        ? `Courriel : ${emails[0]}`
+        : `Courriels : ${joinHumanList(emails)}`);
+    }
+
+    return `Voici les informations de contact indiquées sur le site :\n\n${lines.join("\n")}`;
+  }
+
+  return "";
+}
+
 apiRouter.use("/widget", express.static(widgetDirectory));
 apiRouter.use("/agent", express.static(agentUiDirectory));
 ensureUploadsDirectory();
@@ -716,6 +807,16 @@ apiRouter.post("/chat", async (req, res) => {
     }
 
     const retrievalResult = await retrieveRelevantChunks(siteId, message);
+    const directContactReply = getDirectContactReply(message, retrievalResult);
+    if (directContactReply) {
+      return res.json({
+        reply: directContactReply,
+        sources: retrievalResult.chunks.map((chunk) => chunk.url),
+        handoffSuggested: false,
+        humanHandoff: null
+      });
+    }
+
     const contextBlocks = retrievalResult.chunks
       .map((chunk, index) => {
         return `Source ${index + 1}: ${chunk.url}\n${chunk.text}`;

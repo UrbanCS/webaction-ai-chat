@@ -40,6 +40,29 @@ function exposeImageAltText(html) {
   return html.replace(/<img[^>]+alt=["']([^"']+)["'][^>]*>/gi, " $1 ");
 }
 
+function uniqueValues(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function extractPlainContactFacts(text) {
+  const bodyText = String(text || "");
+  const emails = uniqueValues(bodyText.match(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>.,;:!?]+/g) || []);
+  const phoneMatches = bodyText.match(/(?:\+?\d[\d\s().-]{6,}\d)/g) || [];
+  const phones = uniqueValues(
+    phoneMatches
+      .map((phone) => phone.replace(/\s+/g, " ").trim())
+      .filter((phone) => {
+        const digits = phone.replace(/\D/g, "");
+        return digits.length >= 7 && digits.length <= 15;
+      })
+  );
+
+  return [
+    ...emails.map((email) => `Courriel: ${email}`),
+    ...phones.map((phone) => `Téléphone: ${phone}`)
+  ];
+}
+
 function extractTextFromHtml(html) {
   if (!html || typeof html !== "string") {
     return "";
@@ -59,8 +82,14 @@ function extractTextFromHtml(html) {
     .replace(/\s+\n/g, "\n")
     .replace(/\n\s+/g, "\n")
     .trim();
+  const contactFacts = extractPlainContactFacts(bodyText);
 
-  return [title ? `Titre: ${title}` : "", metaDescription ? `Description: ${metaDescription}` : "", bodyText]
+  return [
+    title ? `Titre: ${title}` : "",
+    metaDescription ? `Description: ${metaDescription}` : "",
+    bodyText,
+    contactFacts.length ? contactFacts.join("\n") : ""
+  ]
     .filter(Boolean)
     .join("\n")
     .trim();
