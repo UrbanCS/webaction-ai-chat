@@ -7,6 +7,8 @@
     welcomeMessage: "Bonjour. Je peux vous aider à trouver rapidement l'information dont vous avez besoin.",
     inputPlaceholder: "Écrivez votre message...",
     sendButtonText: "Envoyer",
+    fontFamily: "Arial, sans-serif",
+    fontUrl: "",
     primaryColor: "#0f766e",
     primaryDarkColor: "#115e59",
     headerDarkColor: "#134e4a"
@@ -21,7 +23,7 @@
 
     var style = document.createElement("style");
     style.textContent =
-      ".wa-chat-root{position:fixed;right:20px;bottom:20px;z-index:999999;font-family:Arial,sans-serif;color:#1f2937}" +
+      ".wa-chat-root{position:fixed;right:20px;bottom:20px;z-index:999999;font-family:var(--wa-chat-font-family,Arial,sans-serif);color:#1f2937}" +
       ".wa-chat-toggle{min-width:148px;height:60px;padding:0 22px;border:none;border-radius:999px;background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-primary-dark,#115e59));color:#fff;font-size:16px;font-weight:800;letter-spacing:.01em;cursor:pointer;box-shadow:0 20px 44px var(--wa-chat-primary-shadow,rgba(15,118,110,.34));line-height:1.1}" +
       ".wa-chat-window{position:absolute;right:0;bottom:80px;width:360px;height:500px;display:flex;flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.2);overflow:hidden}" +
       ".wa-chat-hidden{display:none}" +
@@ -49,7 +51,13 @@
       ".wa-chat-attach svg{width:22px;height:22px;display:block}" +
       ".wa-chat-attachment-name{font-size:12px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
       ".wa-chat-form{display:flex;gap:6px}" +
-      ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff}" +
+      ".wa-chat-input,.wa-chat-support-input,.wa-chat-support-textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1 !important;border-radius:12px;font-size:14px;box-sizing:border-box;background:#fff !important;color:#0f172a !important;-webkit-text-fill-color:#0f172a;opacity:1;appearance:none;-webkit-appearance:none;box-shadow:none !important}" +
+      ".wa-chat-input::placeholder,.wa-chat-support-input::placeholder,.wa-chat-support-textarea::placeholder{color:rgba(124,140,160,.52) !important;-webkit-text-fill-color:rgba(124,140,160,.52) !important;opacity:1}" +
+      ".wa-chat-input::-webkit-input-placeholder,.wa-chat-support-input::-webkit-input-placeholder,.wa-chat-support-textarea::-webkit-input-placeholder{color:rgba(124,140,160,.52) !important;-webkit-text-fill-color:rgba(124,140,160,.52) !important;opacity:1}" +
+      ".wa-chat-input::-moz-placeholder,.wa-chat-support-input::-moz-placeholder,.wa-chat-support-textarea::-moz-placeholder{color:rgba(124,140,160,.52) !important;opacity:1}" +
+      ".wa-chat-input:disabled,.wa-chat-support-input:disabled,.wa-chat-support-textarea:disabled{background:#fff !important;color:#0f172a !important;-webkit-text-fill-color:#0f172a;opacity:1;cursor:not-allowed}" +
+      ".wa-chat-input:disabled::placeholder,.wa-chat-support-input:disabled::placeholder,.wa-chat-support-textarea:disabled::placeholder{color:rgba(124,140,160,.52) !important;-webkit-text-fill-color:rgba(124,140,160,.52) !important;opacity:1}" +
+      ".wa-chat-input:disabled::-webkit-input-placeholder,.wa-chat-support-input:disabled::-webkit-input-placeholder,.wa-chat-support-textarea:disabled::-webkit-input-placeholder{color:rgba(124,140,160,.52) !important;-webkit-text-fill-color:rgba(124,140,160,.52) !important;opacity:1}" +
       ".wa-chat-input:focus,.wa-chat-support-input:focus,.wa-chat-support-textarea:focus{outline:none;border-color:var(--wa-chat-primary,#0f766e);box-shadow:0 0 0 3px var(--wa-chat-focus-shadow,rgba(15,118,110,.12))}" +
       ".wa-chat-input{flex:1;min-width:0}" +
       ".wa-chat-send,.wa-chat-support-submit{border:none;background:linear-gradient(135deg,var(--wa-chat-primary,#0f766e),var(--wa-chat-primary-dark,#115e59));color:#fff;border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:700;flex:0 0 auto}" +
@@ -72,6 +80,24 @@
       "@media (max-width:480px){.wa-chat-root{right:12px;left:12px;bottom:12px}.wa-chat-window{width:100%;height:72vh;right:0;bottom:76px}.wa-chat-toggle{min-width:132px;width:auto;height:54px;padding:0 18px;font-size:15px}}";
     document.head.appendChild(style);
     stylesInjected = true;
+  }
+
+  function ensureFontLoaded(fontUrl) {
+    var normalizedUrl = String(fontUrl || "").trim();
+    if (!normalizedUrl) {
+      return;
+    }
+
+    var existingLink = document.querySelector('link[data-wa-chat-font-url="' + normalizedUrl.replace(/"/g, "&quot;") + '"]');
+    if (existingLink) {
+      return;
+    }
+
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = normalizedUrl;
+    link.setAttribute("data-wa-chat-font-url", normalizedUrl);
+    document.head.appendChild(link);
   }
 
   function createMessage(role, text, options) {
@@ -223,6 +249,7 @@
         ? primaryDarkColor
         : defaultConfig.headerDarkColor;
 
+    root.style.setProperty("--wa-chat-font-family", config.fontFamily || defaultConfig.fontFamily);
     root.style.setProperty("--wa-chat-primary", primaryColor);
     root.style.setProperty("--wa-chat-primary-dark", primaryDarkColor);
     root.style.setProperty("--wa-chat-header-dark", headerDarkColor);
@@ -236,6 +263,7 @@
       throw new Error("WebactionChat.init requires a siteId");
     }
 
+    ensureFontLoaded(config.fontUrl);
     injectStyles();
 
     var existing = document.getElementById("wa-chat-root");
