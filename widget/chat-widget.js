@@ -753,7 +753,7 @@
       handoffCopy.textContent = handoff.agentAvailable
         ? "Une personne semble disponible. Démarrez une conversation en direct maintenant."
         : "Aucun agent ne semble disponible pour le moment. Envoyez votre demande et l'équipe pourra vous répondre plus tard.";
-      supportSubmit.textContent = handoff.agentAvailable ? "Démarrer le clavardage en direct" : "Envoyer la demande";
+      supportSubmit.textContent = handoff.agentAvailable ? "Démarrer" : "Envoyer la demande";
       handoffPanel.classList.remove("wa-chat-hidden");
       saveChatState();
     }
