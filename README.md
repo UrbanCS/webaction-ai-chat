@@ -223,21 +223,3 @@ WebactionChat.init({
 ```
 
 Place the script in the Joomla template or a custom HTML/module area.
-
-## Current MVP Limits
-
-- site storage is JSON-file based
-- cache is in-memory only and resets on restart
-- human handoff requests are stored locally in JSON
-- no auth or admin dashboard
-- retrieval uses simple keyword overlap, not embeddings
-- crawling and extraction are intentionally lightweight
-
-## Next Production Upgrades
-
-- authentication and admin UI
-- persistent database-backed site registry
-- embeddings + vector search
-- pgvector or Supabase storage
-- scheduled reindexing
-- better content extraction for Joomla and WordPress layouts
